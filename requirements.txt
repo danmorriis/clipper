@@ -1,0 +1,10 @@
+librosa==0.10.2
+soundfile==0.12.1
+numpy==1.26.4
+scipy==1.13.0
+PyQt6==6.8.1
+PyQt6-Qt6==6.8.1
+PyQt6-sip>=13.6.0
+setuptools<80
+pytest==8.2.0
+pytest-qt==4.4.0
