@@ -1,0 +1,41 @@
+{
+  "name": "dj-clipper",
+  "version": "1.0.0",
+  "description": "DJ Clipper — extract social clips from DJ sets",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "tsc -p tsconfig.node.json && concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build && tsc -p tsconfig.node.json",
+
+    "build:python": "pyinstaller dj_clipper_api.spec",
+
+    "download-bins:mac": "bash scripts/download-binaries.sh",
+    "download-bins:win": "powershell -ExecutionPolicy Bypass -File scripts/download-binaries.ps1",
+
+    "dist:mac": "npm run build && npx electron-builder --mac --config electron-builder.yml",
+    "dist:win": "npm run build && npx electron-builder --win --config electron-builder.yml"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.28.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@electron/notarize": "^2.3.0",
+    "@types/node": "^20.12.4",
+    "@types/react": "^18.2.74",
+    "@types/react-dom": "^18.2.24",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "electron": "^30.0.1",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.4.4",
+    "vite": "^5.2.7",
+    "wait-on": "^7.2.0"
+  }
+}

@@ -4,7 +4,6 @@ __pycache__/
 *.pyo
 *.pyd
 *.egg-info/
-dist/
 build/
 .eggs/
 
@@ -33,9 +32,38 @@ htmlcov/
 # App temp data
 /tmp/dj_clipper/
 
-# Future: Node / Electron / React
+# Node / Electron / React — build outputs
 node_modules/
+dist/
 dist-electron/
 release/
+out/
+.vite/
+
+# Node — TypeScript incremental build info
+tsconfig.node.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+electron/*.js
+electron/*.js.map
+electron/*.d.ts
+
+# Packaging outputs
 *.dmg
 *.pkg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+*.snap
+
+# PyInstaller outputs
+dj_clipper_api.spec.bak
+dist/dj_clipper_api/    # PyInstaller --onedir output (rebuilt per platform)
+build/                  # PyInstaller intermediate build cache
+
+# Platform binaries — large, downloaded per-platform, not source code
+resources/bin/
+
+# Python settings file written at runtime
+.dj_clipper_settings.json

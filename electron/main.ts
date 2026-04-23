@@ -1,0 +1,81 @@
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import * as path from 'path'
+import { startPython, stopPython } from './pythonManager'
+
+let mainWindow: BrowserWindow | null = null
+let apiBase = ''
+
+function createWindow(port: number): void {
+  apiBase = `http://127.0.0.1:${port}`
+
+  const isMac = process.platform === 'darwin'
+
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 840,
+    minWidth: 960,
+    minHeight: 640,
+    titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    backgroundColor: '#bbb5ae',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+    mainWindow.loadURL('http://localhost:5173')
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+  }
+}
+
+app.whenReady().then(async () => {
+  try {
+    const port = await startPython()
+    createWindow(port)
+  } catch (err) {
+    console.error('Failed to start Python API:', err)
+    dialog.showErrorBox(
+      'Startup Error',
+      'Could not start the DJ Clipper backend. Check that Python 3 is installed.'
+    )
+    app.quit()
+  }
+})
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0 && apiBase) {
+    const port = parseInt(apiBase.split(':')[2])
+    createWindow(port)
+  }
+})
+
+app.on('before-quit', () => {
+  stopPython()
+})
+
+// ── IPC handlers ──────────────────────────────────────────────────────────────
+
+ipcMain.handle('api:getBase', () => apiBase)
+
+ipcMain.handle('dialog:openFile', async (_event, options: Electron.OpenDialogOptions) => {
+  const result = await dialog.showOpenDialog(mainWindow!, options)
+  return result.filePaths
+})
+
+ipcMain.handle('dialog:openFolder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openDirectory'],
+  })
+  return result.filePaths[0] ?? null
+})
+
+ipcMain.on('shell:openFolder', (_event, folderPath: string) => {
+  shell.openPath(folderPath)
+})

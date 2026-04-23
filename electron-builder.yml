@@ -1,0 +1,73 @@
+appId: com.djclipper.app
+productName: DJ Clipper
+copyright: Copyright © 2025 DJ Clipper
+
+# ── Source files included in the Electron app ────────────────────────────────
+files:
+  - dist/**          # Vite React build
+  - electron/**      # compiled Electron TS (main.js, preload.js, pythonManager.js)
+
+# ── Extra resources bundled inside the .app / installer ──────────────────────
+# These are NOT in the asar archive — they live in Contents/Resources/ (mac)
+# or resources/ (win) so the Python binary can be executed.
+#
+# NOTE: dj_clipper_api/ and bin/ are built/downloaded before running electron-builder.
+# Run:  pyinstaller dj_clipper_api.spec           → produces dist/dj_clipper_api/
+#       npm run download-bins:mac  (or :win)       → populates resources/bin/
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64    # Apple Silicon (M1/M2/M3)
+        - x64      # Intel Mac
+  category: public.app-category.music
+  icon: resources/icons/icon.icns
+  # Hardened runtime is required for Apple notarization
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  extraResources:
+    - from: dist/dj_clipper_api
+      to: dj_clipper_api
+    - from: resources/bin/mac
+      to: bin/mac
+
+dmg:
+  background: null
+  window:
+    width: 540
+    height: 380
+
+# Notarization runs after signing — requires APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD
+# / APPLE_TEAM_ID env vars. Script is a no-op if they are not set.
+afterSign: scripts/notarize.js
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icons/icon.ico
+  extraResources:
+    - from: dist/dj_clipper_api
+      to: dj_clipper_api
+    - from: resources/bin/win
+      to: bin/win
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  installerIcon: resources/icons/icon.ico
+  uninstallerIcon: resources/icons/icon.ico
+  license: null
+
+# ── Shared publish config (GitHub Releases) ───────────────────────────────────
+publish:
+  provider: github
+  releaseType: draft
