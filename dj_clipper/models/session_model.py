@@ -32,6 +32,8 @@ class SessionState:
     all_candidates: List[ClipCandidate] = field(default_factory=list)
     # Track names resolved from the playlist (alphabetical); empty when no playlist used
     resolved_track_names: List[str] = field(default_factory=list)
+    # Raw fingerprint timeline from build_track_timeline; used by identify_at
+    timeline: list = field(default_factory=list)
 
     # Export inputs
     output_dir: Optional[Path] = None

@@ -190,6 +190,7 @@ def resolve_playlist(
     playlist_path: Path,
     search_root: Optional[Path] = None,
     progress_callback=None,
+    on_index_start=None,
 ) -> Tuple[List[Path], List[str]]:
     """
     Parse playlist_path and resolve each track to an audio file Path.
@@ -202,6 +203,8 @@ def resolve_playlist(
       → Fuzzy-match the track name string against files under search_root.
 
     search_root is required for fuzzy fallback. If None, only direct M3U paths work.
+    on_index_start() is called just before the music folder is scanned, so callers
+    can surface a meaningful status message during what can be a slow rglob.
 
     Returns:
       found   — list of resolved audio file Paths (deduplicated, in playlist order)
@@ -231,17 +234,11 @@ def resolve_playlist(
     if not entries:
         return [], []
 
-    # Build fuzzy index lazily (only if any entry needs it)
-    _file_index: Optional[Dict[str, Path]] = None
-
-    def file_index() -> Dict[str, Path]:
-        nonlocal _file_index
-        if _file_index is None:
-            if search_root is None:
-                _file_index = {}
-            else:
-                _file_index = _build_file_index(search_root)
-        return _file_index
+    # Pre-build the file index before the per-track loop so the slow rglob
+    # doesn't silently block progress updates on track 1.
+    if on_index_start:
+        on_index_start()
+    file_index: Dict[str, Path] = _build_file_index(search_root) if search_root else {}
 
     found: List[Path] = []
     missing: List[str] = []
@@ -260,7 +257,7 @@ def resolve_playlist(
 
         # 2. Fuzzy search fallback
         if resolved is None:
-            result = _best_match(display_name, file_index())
+            result = _best_match(display_name, file_index)
             if result:
                 resolved = result[0]
 

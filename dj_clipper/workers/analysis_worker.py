@@ -200,13 +200,12 @@ class AnalysisWorker(QRunnable):
                 cancelled_flag[0] = True
                 return
             pct = 20 + int((cur / max(tot, 1)) * 55)
-            mins = int(ts) // 60
-            secs = int(ts) % 60
-            self.signals.progress.emit(pct, f"Fingerprinting timeline… {mins}:{secs:02d}")
+            self.signals.progress.emit(pct, f"Collecting… {cur}/{tot} crumbs")
 
         timeline = build_track_timeline(
             wav_path, db_path, session.video_duration,
             progress_callback=timeline_progress,
+            cancel_event=self.cancel_event,
         )
 
         if cancelled_flag[0] or self.cancel_event.is_set():
@@ -273,14 +272,13 @@ class AnalysisWorker(QRunnable):
                         cancelled_flag[0] = True
                         return
                     pct = 20 + int((cur / max(tot, 1)) * 55)
-                    mins = int(ts) // 60
-                    secs = int(ts) % 60
-                    self.signals.progress.emit(pct, f"Fingerprinting timeline… {mins}:{secs:02d}")
+                    self.signals.progress.emit(pct, f"Collecting… {cur}/{tot} crumbs")
 
                 from dj_clipper.core.transition_finder import build_track_timeline
                 timeline = build_track_timeline(
                     wav_path, db_path, session.video_duration,
                     progress_callback=timeline_progress,
+                    cancel_event=self.cancel_event,
                 )
                 if cancelled_flag[0] or self._check_cancel(session_dir):
                     return None

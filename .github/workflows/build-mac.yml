@@ -1,0 +1,85 @@
+name: Build macOS
+
+on:
+  push:
+    tags:
+      - 'v*'       # trigger on version tags: v1.0.0, v1.2.3, etc.
+  workflow_dispatch: # allow manual trigger from GitHub Actions UI
+
+jobs:
+  build:
+    runs-on: macos-14   # Apple Silicon runner (M1) — also builds x64 via cross-compile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Python ───────────────────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r api/requirements.txt
+          pip install pyinstaller
+
+      # ── Download platform binaries (ffmpeg, ffprobe, fpcalc) ─────────────────
+      - name: Download macOS binaries
+        run: npm run download-bins:mac
+
+      # ── Build Python backend ──────────────────────────────────────────────────
+      - name: Build Python API (PyInstaller)
+        run: pyinstaller dj_clipper_api.spec
+
+      # ── Node / Electron ───────────────────────────────────────────────────────
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build React + compile Electron TypeScript
+        run: npm run build
+
+      # ── Code signing certificate (optional — skipped if secret not set) ───────
+      - name: Import Apple certificate
+        if: ${{ env.CSC_LINK != '' }}
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          echo "$CSC_LINK" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p actions build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions build.keychain
+
+      # ── Package with electron-builder ────────────────────────────────────────
+      - name: Package macOS app
+        env:
+          # Code signing (optional)
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Notarization (optional — notarize.js silently skips if not set)
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # GitHub token for uploading release assets
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac --config electron-builder.yml
+
+      # ── Upload artifacts ──────────────────────────────────────────────────────
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: DJ-Clipper-mac
+          path: release/*.dmg
+          retention-days: 30
