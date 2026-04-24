@@ -1,4 +1,5 @@
 import { ChildProcess, spawn } from 'child_process'
+import { randomUUID } from 'crypto'
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as http from 'http'
@@ -6,6 +7,9 @@ import * as net from 'net'
 import * as path from 'path'
 
 let pythonProcess: ChildProcess | null = null
+let apiToken = ''
+
+export function getToken(): string { return apiToken }
 
 function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -50,7 +54,12 @@ export async function startPython(): Promise<number> {
 
   // In packaged mode, prepend bundled bin/ directory so ffmpeg, ffprobe,
   // and fpcalc are found without needing them on the user's PATH.
-  const env: NodeJS.ProcessEnv = { ...process.env, DJ_CLIPPER_PORT: String(port) }
+  apiToken = randomUUID()
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    DJ_CLIPPER_PORT: String(port),
+    DJ_CLIPPER_TOKEN: apiToken,
+  }
   if (!isDev) {
     const binDir = path.join(
       process.resourcesPath, 'bin',

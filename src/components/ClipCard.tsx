@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { patchCandidate, thumbnailUrl } from '../api/client'
 import { useSessionStore } from '../store/session'
 import type { ClipCandidate } from '../types'
@@ -31,10 +31,11 @@ function fmtTs(t: number): string {
 interface ClipCardProps {
   candidate: ClipCandidate
   selected: boolean
+  isNew?: boolean
   onSelect: () => void
 }
 
-export default function ClipCard({ candidate, selected, onSelect }: ClipCardProps) {
+export default function ClipCard({ candidate, selected, isNew = false, onSelect }: ClipCardProps) {
   const { apiBase, sessionId, updateCandidate, resolvedTrackNames } = useSessionStore((s) => ({
     apiBase: s.apiBase,
     sessionId: s.sessionId,
@@ -43,13 +44,14 @@ export default function ClipCard({ candidate, selected, onSelect }: ClipCardProp
   }))
 
   const [showTrackEdit, setShowTrackEdit] = useState(false)
+  const [imgKey, setImgKey] = useState(0)
+  const retryCount = useRef(0)
 
   const dur = candidate.end_time - candidate.start_time
   const header = `Clip ${candidate.rank}  ·  ${fmtDur(dur)}`
 
   const pre = cleanTrackName(candidate.pre_track)
   const post = cleanTrackName(candidate.post_track)
-  const trackLabel = pre && post ? `${pre} → ${post}` : pre || post || 'Unknown track'
 
   const toggleKept = async () => {
     if (!sessionId) return
@@ -82,12 +84,26 @@ export default function ClipCard({ candidate, selected, onSelect }: ClipCardProp
       >
         <div className="relative w-full bg-surface-high" style={{ aspectRatio: '16/9' }}>
           {thumbSrc && (
-            <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
+            <img
+              key={imgKey}
+              src={thumbSrc}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={() => {
+                if (retryCount.current < 6) {
+                  retryCount.current++
+                  setTimeout(() => setImgKey((k) => k + 1), 1500)
+                }
+              }}
+            />
           )}
           {!thumbSrc && (
             <div className="absolute inset-0 flex items-center justify-center text-muted text-xs">
               No preview
             </div>
+          )}
+          {isNew && (
+            <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full bg-accent" />
           )}
         </div>
 
@@ -97,29 +113,24 @@ export default function ClipCard({ candidate, selected, onSelect }: ClipCardProp
             <span className="text-[10px] text-muted">{fmtTs(candidate.start_time)}</span>
           </div>
 
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[11px] text-muted truncate flex-1">{trackLabel}</p>
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowTrackEdit(true) }}
-              className="text-[10px] text-muted hover:text-foreground shrink-0"
-            >
-              ✏
-            </button>
-          </div>
+          <p className="text-[11px] text-muted truncate">
+            {pre && post ? `${pre} → ${post}` : pre || post || 'Unknown track'}
+          </p>
 
-          <button
-            onClick={(e) => { e.stopPropagation(); toggleKept() }}
-            className={`
-              self-start text-[10px] px-2 py-0.5 rounded-full border transition-colors
-              ${candidate.kept
-                ? 'border-green-600 text-green-700 hover:bg-red-100 hover:border-red-500 hover:text-red-600'
-                : 'border-red-400 text-red-600 hover:bg-green-100 hover:border-green-600 hover:text-green-700'
-              }
-            `}
-          >
-            {candidate.kept ? 'Keep' : 'Binned'}
-          </button>
         </div>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleKept() }}
+          className={`
+            w-full py-1 text-[10px] font-medium tracking-[0.08em] uppercase
+            ${candidate.kept
+              ? 'bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800'
+              : 'bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700'
+            }
+          `}
+        >
+          {candidate.kept ? 'Keep' : 'Binned'}
+        </button>
       </div>
 
       {showTrackEdit && (

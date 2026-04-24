@@ -5,6 +5,7 @@ Runs the export pipeline in a plain thread, putting progress events
 (including clip_done events) onto a queue.Queue.
 """
 
+import datetime
 import queue
 import threading
 from pathlib import Path
@@ -33,8 +34,21 @@ def run_export(
     """Entry point for ThreadPoolExecutor."""
     try:
         kept = session.kept_clips
-        output_dir = session.output_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
+        base_dir = session.output_dir
+
+        # Create "ClipLab export YYYY-MM-DD" subdirectory, avoiding collisions
+        date_str = datetime.date.today().strftime("%Y-%m-%d")
+        base_name = f"ClipLab export {date_str}"
+        export_dir = base_dir / base_name
+        if export_dir.exists():
+            n = 1
+            while (base_dir / f"{base_name}-{n}").exists():
+                n += 1
+            export_dir = base_dir / f"{base_name}-{n}"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        # Update session so other parts of the code can reference the final dir
+        session.output_dir = export_dir
+        output_dir = export_dir
 
         total_kept = len(kept)
         results: List[Tuple[ClipCandidate, List[TrackMatch]]] = []
@@ -57,9 +71,10 @@ def run_export(
             results.append((candidate, analysis_matches))
             progress_queue.put({
                 "percent": pct,
-                "message": f"Exported clip {i + 1}",
+                "message": f"Exported Clip {candidate.rank}",
                 "clip_done": {
                     "index": i,
+                    "rank": candidate.rank,
                     "path": str(clip_path),
                     "tracks": [
                         {"track_name": m.track_name, "confidence": m.confidence}
@@ -89,9 +104,15 @@ def run_export(
                 results = _identify_pass(session, results, output_dir, start_pct=65, cancel_event=cancel_event, q=progress_queue)
 
         _emit(progress_queue, 99, "Writing tracklist.txt…")
-        _write_tracklist(output_dir, results)
+        tracklist_lines = _write_tracklist(output_dir, results)
 
-        progress_queue.put({"percent": 100, "message": "Export complete.", "done": True})
+        progress_queue.put({
+            "percent": 100,
+            "message": "Export complete.",
+            "done": True,
+            "export_dir": str(output_dir),
+            "tracklist": "\n".join(tracklist_lines),
+        })
 
     except Exception as exc:
         progress_queue.put({"error": str(exc), "done": True})
@@ -145,10 +166,10 @@ def _identify_pass(session, results, output_dir, start_pct, cancel_event, q):
     return results
 
 
-def _write_tracklist(output_dir: Path, results):
+def _write_tracklist(output_dir: Path, results) -> List[str]:
     lines = []
-    for file_idx, (candidate, matches) in enumerate(results, 1):
-        filename = f"clip_{file_idx:03d}"
+    for candidate, matches in results:
+        filename = f"Clip {candidate.rank}"
         t = int(candidate.start_time)
         ts = f"{t // 3600}:{(t % 3600) // 60:02d}:{t % 60:02d}"
 
@@ -164,4 +185,4 @@ def _write_tracklist(output_dir: Path, results):
 
     tl_path = output_dir / "tracklist.txt"
     tl_path.write_text("\n".join(lines))
-    return tl_path
+    return lines

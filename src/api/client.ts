@@ -6,8 +6,17 @@
 
 import type { AnalysisParams, ClipCandidate, Session } from '../types'
 
+let _token = ''
+export function setApiToken(token: string) { _token = token }
+export function authHeader(): Record<string, string> {
+  return _token ? { 'X-Clipper-Token': _token } : {}
+}
+
 async function request<T>(base: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${base}${path}`, init)
+  const res = await fetch(`${base}${path}`, {
+    ...init,
+    headers: { ...authHeader(), ...(init?.headers as Record<string, string> ?? {}) },
+  })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`${res.status} ${res.statusText}: ${text}`)
@@ -140,12 +149,23 @@ export function setSearchRoot(base: string, path: string): Promise<{ path: strin
   })
 }
 
+export function identifyAt(base: string, sessionId: string, t: number): Promise<{ track: string | null; confidence: number }> {
+  return request(base, `/sessions/${sessionId}/identify-at?t=${t}`)
+}
+
 // ── URL helpers ───────────────────────────────────────────────────────────────
 
 export function thumbnailUrl(base: string, sessionId: string, rank: number): string {
-  return `${base}/sessions/${sessionId}/thumbnails/${rank}`
+  const t = _token ? `?token=${encodeURIComponent(_token)}` : ''
+  return `${base}/sessions/${sessionId}/thumbnails/${rank}${t}`
 }
 
 export function videoUrl(base: string, videoPath: string): string {
-  return `${base}/video?path=${encodeURIComponent(videoPath)}`
+  const t = _token ? `&token=${encodeURIComponent(_token)}` : ''
+  return `${base}/video?path=${encodeURIComponent(videoPath)}${t}`
+}
+
+export function frameUrl(base: string, videoPath: string, t: number): string {
+  const tok = _token ? `&token=${encodeURIComponent(_token)}` : ''
+  return `${base}/video/frame?path=${encodeURIComponent(videoPath)}&t=${t}${tok}`
 }

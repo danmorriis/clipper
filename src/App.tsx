@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { HashRouter, Route, Routes } from 'react-router-dom'
+import { setApiToken } from './api/client'
 import { useSessionStore } from './store/session'
 import ImportScreen from './screens/ImportScreen'
 import ReviewScreen from './screens/ReviewScreen'
@@ -13,6 +14,7 @@ declare global {
       openFolderDialog(): Promise<string | null>
       openFolder(path: string): void
       getApiBase(): Promise<string>
+      getToken(): Promise<string>
       platform(): string
     }
   }
@@ -25,10 +27,14 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       if (window.electronAPI) {
-        const base = await window.electronAPI.getApiBase()
+        const [base, token] = await Promise.all([
+          window.electronAPI.getApiBase(),
+          window.electronAPI.getToken(),
+        ])
         setApiBase(base)
+        setApiToken(token)
       } else {
-        // Dev fallback: use env or default
+        // Dev fallback: use env or default (no token — middleware skips check when unset)
         setApiBase(import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:9001')
       }
       setReady(true)

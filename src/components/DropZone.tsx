@@ -7,12 +7,14 @@ interface DropZoneProps {
   accept?: string[]
   value: string | null
   onChange: (path: string) => void
+  onClear?: () => void
+  clearSide?: 'left' | 'right'
   error?: boolean
   errorMessage?: string
   style?: React.CSSProperties
 }
 
-export default function DropZone({ label, sublabel, accept, value, onChange, error, errorMessage, style }: DropZoneProps) {
+export default function DropZone({ label, sublabel, accept, value, onChange, onClear, clearSide = 'right', error, errorMessage, style }: DropZoneProps) {
   const apiBase = useSessionStore((s) => s.apiBase)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -52,7 +54,7 @@ export default function DropZone({ label, sublabel, accept, value, onChange, err
       style={style}
       className={`
         relative flex flex-col items-center justify-center gap-1
-        h-24 rounded-lg border-2 cursor-pointer
+        w-full h-24 rounded-lg border-2 cursor-pointer overflow-hidden
         transition-colors select-none
         ${dragging
           ? 'border-solid border-foreground bg-foreground/10'
@@ -74,6 +76,18 @@ export default function DropZone({ label, sublabel, accept, value, onChange, err
           if (f) onChange((f as File & { path?: string }).path ?? f.name)
         }}
       />
+      {filename && onClear && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onClear() }}
+          className={`absolute top-2 ${clearSide === 'right' ? 'right-2' : 'left-2'} w-5 h-5 flex items-center justify-center rounded-full text-muted hover:text-foreground transition-colors`}
+          aria-label="Clear"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </button>
+      )}
       {filename ? (
         <>
           <span className="text-xs text-foreground font-medium truncate max-w-[90%]">{filename}</span>

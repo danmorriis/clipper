@@ -140,7 +140,11 @@ def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
         _emit(q, 14, "No tracks resolved — falling back to spectral…")
         return _run_spectral_mode(session, wav_path, cancel_event, q)
 
-    session.resolved_track_names = sorted(p.stem for p in found_paths)
+    # Store ALL track names from the playlist (not just found files) so the
+    # review-screen track-edit dropdowns are fully populated.
+    from dj_clipper.core.playlist_resolver import parse_playlist
+    all_playlist_names = parse_playlist(session.playlist_path)
+    session.resolved_track_names = sorted(set(all_playlist_names)) if all_playlist_names else sorted(p.stem for p in found_paths)
 
     if missing:
         _emit(q, 14, f"Warning: {len(missing)} track(s) not found on disk")
@@ -164,13 +168,12 @@ def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
             cancelled_flag[0] = True
             return
         pct = 20 + int((cur / max(tot, 1)) * 55)
-        mins = int(ts) // 60
-        secs = int(ts) % 60
-        _emit(q, pct, f"Fingerprinting timeline… {mins}:{secs:02d}")
+        _emit(q, pct, f"Collecting… {cur}/{tot} crumbs")
 
     timeline = build_track_timeline(
         wav_path, db_path, session.video_duration,
         progress_callback=timeline_progress,
+        cancel_event=cancel_event,
     )
 
     if cancelled_flag[0] or cancel_event.is_set():
@@ -227,13 +230,12 @@ def _run_timeslot_mode(session, session_dir, wav_path, cancel_event, q):
                     cancelled_flag[0] = True
                     return
                 pct = 20 + int((cur / max(tot, 1)) * 55)
-                mins = int(ts) // 60
-                secs = int(ts) % 60
-                _emit(q, pct, f"Fingerprinting timeline… {mins}:{secs:02d}")
+                _emit(q, pct, f"Collecting… {cur}/{tot} crumbs")
 
             timeline = build_track_timeline(
                 wav_path, db_path, session.video_duration,
                 progress_callback=timeline_progress,
+                cancel_event=cancel_event,
             )
             if cancelled_flag[0] or _check_cancel(cancel_event, session_dir, q):
                 return None

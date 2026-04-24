@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import * as path from 'path'
-import { startPython, stopPython } from './pythonManager'
+import { getToken, startPython, stopPython } from './pythonManager'
 
 let mainWindow: BrowserWindow | null = null
 let apiBase = ''
@@ -63,6 +63,7 @@ app.on('before-quit', () => {
 // ── IPC handlers ──────────────────────────────────────────────────────────────
 
 ipcMain.handle('api:getBase', () => apiBase)
+ipcMain.handle('api:getToken', () => getToken())
 
 ipcMain.handle('dialog:openFile', async (_event, options: Electron.OpenDialogOptions) => {
   const result = await dialog.showOpenDialog(mainWindow!, options)

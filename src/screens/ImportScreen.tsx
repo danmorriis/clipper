@@ -108,7 +108,7 @@ export default function ImportScreen() {
     if (folder) handleSearchRootChange(folder)
   }
 
-  const canCreate = videoPath && videoDuration >= 300 && !videoError && (mode !== 'timeslots' || (tsText.trim() && !tsError))
+  const canCreate = videoPath && videoDuration >= 300 && !videoError && playlistPath && (mode !== 'timeslots' || (tsText.trim() && !tsError))
 
   const handleCreate = async () => {
     if (!canCreate) return
@@ -191,7 +191,7 @@ export default function ImportScreen() {
       {/* macOS drag region */}
       <TitleBarSpacer />
 
-      {/* Progress overlay — tracks platter center */}
+      {/* Progress message — centred over platter */}
       {analysing && (
         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
@@ -202,12 +202,6 @@ export default function ImportScreen() {
               {progress.message}
             </p>
             {progressError && <p className="text-xs text-red-700">{progressError}</p>}
-            <button
-              onClick={handleCancel}
-              className="mt-2 px-4 py-1.5 rounded-full text-[10px] font-medium tracking-[0.1em] uppercase text-muted border border-muted hover:text-foreground hover:border-foreground transition-colors pointer-events-auto"
-            >
-              Cancel
-            </button>
           </div>
         </div>
       )}
@@ -324,26 +318,30 @@ export default function ImportScreen() {
 
           {/* Drop zones — extended outward so outer top corners reach the circle edge */}
           <div className="flex gap-3 items-start -mt-10" style={{ marginLeft: -10, marginRight: -10 }}>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <DropZone
                 label="Video"
                 sublabel="MP4, MOV, MKV…"
                 accept={['mp4', 'mov', 'mkv', 'avi', 'webm']}
                 value={videoPath}
                 onChange={handleVideoChange}
+                onClear={() => { setVideoPath(null); setVideoDuration(0); setVideoError('') }}
+                clearSide="right"
                 error={!!videoError}
                 errorMessage={videoError || undefined}
                 style={{ height: 220, borderRadius: '8px 8px 8px 269px', paddingBottom: 48, paddingLeft: 28 }}
               />
             </div>
 
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <DropZone
                 label="Tracklist"
-                sublabel="M3U, M3U8, TXT (optional)"
+                sublabel="M3U, M3U8, TXT"
                 accept={['m3u', 'm3u8', 'txt']}
                 value={playlistPath}
                 onChange={setPlaylistPath}
+                onClear={() => setPlaylistPath(null)}
+                clearSide="left"
                 style={{ height: 220, borderRadius: '8px 8px 269px 8px', paddingBottom: 48, paddingRight: 28 }}
               />
             </div>
@@ -353,13 +351,13 @@ export default function ImportScreen() {
       </div>
 
       {/* Footer — fixed 512px wide, pinned to window bottom */}
-      <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[512px] transition-opacity duration-500"
-        style={uiOpacity}
-      >
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[512px]">
         <div className="px-8 py-4 flex flex-col gap-3">
 
-          <div className="flex flex-col gap-1.5">
+          <div
+            className="flex flex-col gap-1.5 transition-opacity duration-500"
+            style={{ opacity: playlistPath && !analysing ? 1 : 0, pointerEvents: playlistPath && !analysing ? 'auto' : 'none' }}
+          >
             <div className="flex items-center gap-1.5">
               <label className="text-[11px] text-muted font-medium uppercase tracking-[0.1em]">
                 Music Folder
@@ -392,13 +390,24 @@ export default function ImportScreen() {
             </div>
           </div>
 
-          <button
-            onClick={handleCreate}
-            disabled={!canCreate}
-            className="w-full py-3 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent/90 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
-          >
-            Create Clips
-          </button>
+          {analysing ? (
+            <div className="flex justify-center">
+              <button
+                onClick={handleCancel}
+                className="px-4 py-1.5 rounded-full text-[10px] font-medium tracking-[0.1em] uppercase text-muted border border-muted hover:text-foreground hover:border-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleCreate}
+              disabled={!canCreate}
+              className="w-full py-3 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent/90 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+            >
+              Create Clips
+            </button>
+          )}
 
         </div>
       </div>

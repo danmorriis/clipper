@@ -51,5 +51,7 @@ export interface ProgressEvent {
   cancelled?: boolean
   thumbnail_ready?: { rank: number; path: string }
   thumbnails_done?: boolean
-  clip_done?: { index: number; path: string; tracks: { track_name: string; confidence: number }[] }
+  clip_done?: { index: number; rank?: number; path: string; tracks: { track_name: string; confidence: number }[] }
+  tracklist?: string
+  export_dir?: string
 }

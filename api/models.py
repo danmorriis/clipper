@@ -112,13 +112,18 @@ def candidate_to_out(c) -> ClipCandidateOut:
 
 def session_to_out(entry) -> SessionOut:
     s = entry.state
+    # In all/timeslot mode every candidate is already displayed — mark pool exhausted
+    # so the frontend hides the "Generate More" button.
+    clip_all = s.settings.clip_all if s.settings else False
+    timeslot = bool(s.settings.manual_timestamps) if s.settings else False
+    next_idx = len(s.all_candidates) if (clip_all or timeslot) else entry.next_all_idx
     return SessionOut(
         session_id=s.session_id,
         video_path=str(s.video_path) if s.video_path else None,
         video_duration=s.video_duration,
         candidates=[candidate_to_out(c) for c in s.candidates],
         all_candidates_count=len(s.all_candidates),
-        next_all_idx=entry.next_all_idx,
+        next_all_idx=next_idx,
         resolved_track_names=s.resolved_track_names,
         output_dir=str(s.output_dir) if s.output_dir else None,
     )

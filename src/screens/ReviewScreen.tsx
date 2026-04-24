@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { generateMore, getSession } from '../api/client'
+import { addManualClip, generateMore, getSession } from '../api/client'
 import ClipGrid from '../components/ClipGrid'
 import TitleBarSpacer from '../components/TitleBarSpacer'
 import VideoPlayer from '../components/VideoPlayer'
@@ -14,24 +14,27 @@ export default function ReviewScreen() {
     apiBase,
     candidates,
     selectedRank,
+    newRanks,
     allCandidatesCount,
     nextAllIdx,
     selectCard,
     addCandidates,
+    markNewRanks,
     setSession,
-    setCandidates,
   } = useSessionStore((s) => ({
     apiBase: s.apiBase,
     candidates: s.candidates,
     selectedRank: s.selectedRank,
+    newRanks: s.newRanks,
     allCandidatesCount: s.allCandidatesCount,
     nextAllIdx: s.nextAllIdx,
     selectCard: s.selectCard,
     addCandidates: s.addCandidates,
+    markNewRanks: s.markNewRanks,
     setSession: s.setSession,
-    setCandidates: s.setCandidates,
   }))
   const storeSessionId = useSessionStore((s) => s.sessionId)
+  const [addClipMode, setAddClipMode] = useState(false)
 
   // Reload session state if page was navigated to directly (e.g. dev reload)
   useEffect(() => {
@@ -41,6 +44,21 @@ export default function ReviewScreen() {
   }, [sessionId, apiBase, storeSessionId, setSession])
 
   const selectedCandidate = candidates.find((c) => c.rank === selectedRank) ?? null
+
+  const handleAddClip = async (start: number, end: number, pre: string | null, post: string | null) => {
+    if (!sessionId) return
+    try {
+      const clip = await addManualClip(apiBase, sessionId, {
+        start_time: start,
+        end_time: end,
+        pre_track: pre ?? undefined,
+        post_track: post ?? undefined,
+      })
+      addCandidates([clip])
+      markNewRanks([clip.rank])
+    } catch {}
+    setAddClipMode(false)
+  }
 
   const keptCount = candidates.filter((c) => c.kept).length
   const hasMore = nextAllIdx < allCandidatesCount
@@ -66,6 +84,7 @@ export default function ReviewScreen() {
     try {
       const more = await generateMore(apiBase, sessionId, 5)
       addCandidates(more)
+      markNewRanks(more.map((c) => c.rank))
     } catch {}
   }
 
@@ -89,7 +108,7 @@ export default function ReviewScreen() {
         {hasMore && (
           <button
             onClick={handleGenerateMore}
-            className="text-xs text-muted hover:text-foreground transition-colors"
+            className="px-3 py-1 text-xs rounded bg-green-100 text-green-800 border border-green-300 hover:bg-green-200 transition-colors"
           >
             Generate More
           </button>
@@ -114,17 +133,26 @@ export default function ReviewScreen() {
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
         {/* Clip grid — left column */}
-        <div className="w-[380px] shrink-0 border-r border-border overflow-hidden flex flex-col">
-          <ClipGrid
-            candidates={candidates}
-            selectedRank={selectedRank}
-            onSelect={selectCard}
-          />
+        <div className="w-[380px] shrink-0 border-r border-border flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <ClipGrid
+              candidates={candidates}
+              selectedRank={selectedRank}
+              newRanks={newRanks}
+              onSelect={(rank) => { setAddClipMode(false); selectCard(rank) }}
+              onAddMode={() => { selectCard(null); setAddClipMode(true) }}
+            />
+          </div>
         </div>
 
         {/* Video player — right column */}
         <div className="flex-1 p-4 overflow-y-auto">
-          <VideoPlayer candidate={selectedCandidate} />
+          <VideoPlayer
+            candidate={addClipMode ? null : selectedCandidate}
+            addClipMode={addClipMode}
+            onAddClip={handleAddClip}
+            onCancelAdd={() => setAddClipMode(false)}
+          />
         </div>
       </div>
     </div>

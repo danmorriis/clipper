@@ -23,28 +23,30 @@ export default function TrackEditModal({ candidate, trackNames, onSave, onClose 
         <label className="flex flex-col gap-1">
           <span className="text-xs text-muted">Track Before</span>
           <input
-            list="track-names"
+            list={`track-names-${candidate.rank}-pre`}
             value={pre}
             onChange={(e) => setPre(e.target.value)}
             placeholder="Artist - Track name"
             className="bg-surface-high border border-border rounded px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-foreground"
           />
+          <datalist id={`track-names-${candidate.rank}-pre`}>
+            {trackNames.map((t) => <option key={t} value={t} />)}
+          </datalist>
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="text-xs text-muted">Track After</span>
           <input
-            list="track-names"
+            list={`track-names-${candidate.rank}-post`}
             value={post}
             onChange={(e) => setPost(e.target.value)}
             placeholder="Artist - Track name"
             className="bg-surface-high border border-border rounded px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-foreground"
           />
+          <datalist id={`track-names-${candidate.rank}-post`}>
+            {trackNames.map((t) => <option key={t} value={t} />)}
+          </datalist>
         </label>
-
-        <datalist id="track-names">
-          {trackNames.map((t) => <option key={t} value={t} />)}
-        </datalist>
 
         <div className="flex gap-2 justify-end">
           <button

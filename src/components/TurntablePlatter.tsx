@@ -25,21 +25,14 @@ export default function TurntablePlatter({ analysing = false, percent = 0 }: Pro
             <circle cx="300" cy="300" r="288" fill="#b3ada7" stroke="#9a9490" strokeWidth="2" />
           </g>
 
-          {/* Orange progress circle — counter-rotated so it appears stationary */}
-          {analysing && radius > 0 && (
-            <circle
-              cx="300"
-              cy="300"
-              r={radius}
-              fill="#d94e00"
-              opacity="0.85"
-              style={{
-                transformBox: 'fill-box',
-                transformOrigin: 'center',
-                animation: 'platter-spin-reverse 70s linear infinite',
-              }}
-            />
-          )}
+          {/* Orange progress circle — always present, r transitions smoothly */}
+          <circle
+            cx="300"
+            cy="300"
+            fill="#d94e00"
+            opacity="0.85"
+            style={{ r: `${radius}` as any, transition: 'r 0.8s ease' } as React.CSSProperties}
+          />
 
           {/* Lines — rendered above the orange circle */}
           <g opacity="0.5">

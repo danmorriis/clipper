@@ -18,8 +18,11 @@ interface SessionStore {
 
   // UI state
   selectedRank: number | null
+  newRanks: Set<number>
 
   // Actions
+  markNewRanks: (ranks: number[]) => void
+  clearNewRank: (rank: number) => void
   setSession: (session: {
     session_id: string
     video_path: string | null
@@ -50,6 +53,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   resolvedTrackNames: [],
   outputDir: null,
   selectedRank: null,
+  newRanks: new Set<number>(),
+
+  markNewRanks: (ranks) =>
+    set((state) => ({ newRanks: new Set([...state.newRanks, ...ranks]) })),
+
+  clearNewRank: (rank) =>
+    set((state) => {
+      const next = new Set(state.newRanks)
+      next.delete(rank)
+      return { newRanks: next }
+    }),
 
   setSession: (s) =>
     set({
@@ -80,7 +94,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return { candidates: merged }
     }),
 
-  selectCard: (rank) => set({ selectedRank: rank }),
+  selectCard: (rank) =>
+    set((state) => {
+      if (rank === null) return { selectedRank: null }
+      const newRanks = new Set(state.newRanks)
+      newRanks.delete(rank)
+      return { selectedRank: rank, newRanks }
+    }),
 
   reset: () =>
     set({

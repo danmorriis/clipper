@@ -29,6 +29,7 @@ interface TrimBarProps {
   playhead: number
   unlocked: boolean
   maxClip?: number
+  getFrameUrl?: (t: number) => string
   onTrimChange: (start: number, end: number) => void
   onCommit: (start: number, end: number) => void
   onSeek: (t: number) => void
@@ -42,6 +43,7 @@ export default function TrimBar({
   playhead,
   unlocked,
   maxClip = 60,
+  getFrameUrl,
   onTrimChange,
   onCommit,
   onSeek,
@@ -167,6 +169,13 @@ export default function TrimBar({
   const lx = Math.max(0, Math.min(sx - lblW / 2, w - lblW))
   const rx = Math.max(lx + lblW + 4, Math.min(ex - lblW / 2, w - lblW))
 
+  // Thumbnail frame timestamps every 30 s across the context window
+  const THUMB_STEP = 30
+  const thumbTimes: number[] = []
+  for (let t = Math.floor(ctxStart / THUMB_STEP) * THUMB_STEP; t < ctxEnd; t += THUMB_STEP) {
+    thumbTimes.push(t)
+  }
+
   return (
     <svg
       ref={svgRef}
@@ -175,22 +184,51 @@ export default function TrimBar({
       onMouseDown={startGlobalDrag}
       style={{ cursor: 'pointer', userSelect: 'none' }}
     >
+      <defs>
+        <clipPath id="trimbar-clip">
+          <rect x={HANDLE_W / 2} y={BAR_TOP} width={Math.max(0, w - HANDLE_W)} height={BAR_H} rx={4} />
+        </clipPath>
+      </defs>
+
       {/* Context labels */}
-      <text x={0} y={11} fontSize={9} fill="#cccccc" textAnchor="start">{fmtTs(ctxStart)}</text>
-      <text x={w} y={11} fontSize={9} fill="#cccccc" textAnchor="end">{fmtTs(ctxEnd)}</text>
+      <text x={0} y={11} fontSize={9} fill="#555555" textAnchor="start">{fmtTs(ctxStart)}</text>
+      <text x={w} y={11} fontSize={9} fill="#555555" textAnchor="end">{fmtTs(ctxEnd)}</text>
 
-      {/* Background track */}
-      <rect x={0} y={BAR_TOP} width={w} height={BAR_H} rx={5} fill="#222222" />
+      {/* Background track — dark fallback while thumbnails load */}
+      <rect x={HANDLE_W / 2} y={BAR_TOP} width={Math.max(0, w - HANDLE_W)} height={BAR_H} rx={4} fill="#1a1a1a" />
 
-      {/* Clip region */}
-      <rect x={sx} y={BAR_TOP} width={Math.max(0, ex - sx)} height={BAR_H} fill={fillColor} />
-
-      {/* Dim overlays */}
-      {sx > 0 && (
-        <rect x={0} y={BAR_TOP} width={sx} height={BAR_H} rx={5} fill="rgba(0,0,0,0.59)" />
+      {/* Thumbnail strip */}
+      {getFrameUrl && (
+        <g clipPath="url(#trimbar-clip)">
+          {thumbTimes.map((t) => {
+            const x0 = tToX(Math.max(t, ctxStart), w)
+            const x1 = tToX(Math.min(t + THUMB_STEP, ctxEnd), w)
+            return (
+              <image
+                key={t}
+                href={getFrameUrl(t)}
+                x={x0}
+                y={BAR_TOP}
+                width={Math.max(0, x1 - x0)}
+                height={BAR_H}
+                preserveAspectRatio="xMidYMid slice"
+              />
+            )
+          })}
+        </g>
       )}
-      {ex < w && (
-        <rect x={ex} y={BAR_TOP} width={w - ex} height={BAR_H} rx={5} fill="rgba(0,0,0,0.59)" />
+
+      {/* Dim outside the clip region */}
+      {sx > HANDLE_W / 2 && (
+        <rect x={HANDLE_W / 2} y={BAR_TOP} width={sx - HANDLE_W / 2} height={BAR_H} fill="rgba(0,0,0,0.62)" clipPath="url(#trimbar-clip)" />
+      )}
+      {ex < w - HANDLE_W / 2 && (
+        <rect x={ex} y={BAR_TOP} width={w - HANDLE_W / 2 - ex} height={BAR_H} fill="rgba(0,0,0,0.62)" clipPath="url(#trimbar-clip)" />
+      )}
+
+      {/* Tint the clip region when unlocked (orange hue) */}
+      {unlocked && (
+        <rect x={sx} y={BAR_TOP} width={Math.max(0, ex - sx)} height={BAR_H} fill="rgba(255,120,40,0.18)" />
       )}
 
       {/* Border around clip region */}
@@ -226,10 +264,10 @@ export default function TrimBar({
       )}
 
       {/* Handle timestamp labels */}
-      <text x={lx + lblW / 2} y={BAR_TOP + BAR_H + 14} fontSize={8} fill="#aaaaaa" textAnchor="middle">
+      <text x={lx + lblW / 2} y={BAR_TOP + BAR_H + 14} fontSize={8} fill="#555555" textAnchor="middle">
         {fmtTs(trimStart)}
       </text>
-      <text x={rx + lblW / 2} y={BAR_TOP + BAR_H + 14} fontSize={8} fill="#aaaaaa" textAnchor="middle">
+      <text x={rx + lblW / 2} y={BAR_TOP + BAR_H + 14} fontSize={8} fill="#555555" textAnchor="middle">
         {fmtTs(trimEnd)}
       </text>
     </svg>

@@ -8,7 +8,7 @@ class ExportError(Exception):
     pass
 
 
-def export_clip(video_path: Path, candidate: ClipCandidate, output_dir: Path, index: int) -> Path:
+def export_clip(video_path: Path, candidate: ClipCandidate, output_dir: Path, index: int = 0) -> Path:
     """
     Export a clip using fast input-seeking + re-encode for frame-accurate duration.
 
@@ -16,9 +16,10 @@ def export_clip(video_path: Path, candidate: ClipCandidate, output_dir: Path, in
     seconds longer or shorter than requested.  Re-encoding with ultrafast preset
     is slower but guarantees the output matches start_time → end_time exactly.
     setpts/asetpts reset timestamps so the clip starts at 0:00.
+    File is named "Clip {rank}.mp4" to match the review UI display name.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"clip_{index:03d}.mp4"
+    output_path = output_dir / f"Clip {candidate.rank}.mp4"
     duration = candidate.end_time - candidate.start_time
     result = subprocess.run(
         [

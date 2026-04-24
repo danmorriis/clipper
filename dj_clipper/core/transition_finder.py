@@ -10,22 +10,26 @@ carrying pre_track / post_track labels so the review UI can display them
 and the export worker can write them to tracklist.txt without re-querying.
 """
 
-import tempfile
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
-from dj_clipper.core.audio_extractor import extract_audio_segment
-from dj_clipper.core.fingerprint_db import query_clip
+import numpy as np
+import scipy.io.wavfile as wavfile
+
+from dj_clipper.core.fingerprint_db import fingerprint_pcm, preload_index, query_clip_preloaded
 from dj_clipper.models.clip_model import ClipCandidate
 
 # ── Tuning constants ─────────────────────────────────────────────────────────
 
 # Step between sample start points. Smaller = finer resolution but slower.
-# At 20 s steps across a 2-hour video: ~360 samples ≈ 3–5 min total.
+# At 20 s steps across a 2-hour video: ~360 samples.
 SAMPLE_STEP: float = 20.0
 
-# Length of each audio sample fed to fpcalc.
+# Length of each audio sample fed to the fingerprinter.
 SAMPLE_DURATION: float = 20.0
 
 # A sample must clear this fingerprint confidence to be counted as "identified".
@@ -70,49 +74,112 @@ class _TrackRun:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def _fingerprint_sample_pcm(
+    pcm: np.ndarray,
+    sample_rate: int,
+    index: Dict[str, np.ndarray],
+    start: float,
+) -> _TimelineEntry:
+    """
+    Slice a pre-decoded PCM array, fingerprint via libchromaprint (no subprocess),
+    and compare against the pre-loaded index.  Entirely in-memory, thread-safe.
+    """
+    s = int(start * sample_rate)
+    e = int((start + SAMPLE_DURATION) * sample_rate)
+    chunk = pcm[s:e]
+    if len(chunk) == 0:
+        return _TimelineEntry(start=start, track=None, confidence=0.0)
+
+    fp_ints = fingerprint_pcm(chunk, sample_rate)
+    if fp_ints:
+        matches = query_clip_preloaded(fp_ints, index, MIN_CONFIDENCE)
+        if matches:
+            return _TimelineEntry(start=start, track=matches[0].track_name, confidence=matches[0].confidence)
+    return _TimelineEntry(start=start, track=None, confidence=0.0)
+
+
 def build_track_timeline(
     session_wav: Path,
     db_path: Path,
     video_duration: float,
     progress_callback: Optional[Callable[[int, int, float], None]] = None,
+    cancel_event: Optional[threading.Event] = None,
 ) -> List[_TimelineEntry]:
     """
     Sample session_wav at SAMPLE_STEP intervals, fingerprint each sample
-    against db_path, and return a timeline of track identifications.
+    in parallel, and return a timeline of track identifications sorted
+    chronologically.
 
-    progress_callback(current, total, timestamp_seconds) is called per sample.
-    All temporary WAV files are deleted immediately after each query.
+    Strategy:
+      1. Decode the full session WAV to a numpy int16 array once (no per-sample
+         disk I/O or subprocess overhead from ffmpeg).
+      2. Slice PCM chunks in memory — instant numpy indexing.
+      3. Fingerprint each chunk via libchromaprint directly (ctypes call releases
+         the GIL, giving true thread-level parallelism). Falls back to fpcalc
+         subprocess if the library is unavailable.
+      4. Compare against the pre-loaded fingerprint index (no JSON reads in loop).
+
+    progress_callback(current, total, timestamp_seconds) fires as each sample
+    completes (non-deterministic order in parallel mode).
+    cancel_event, if set, causes remaining futures to be abandoned.
     """
-    sample_starts = []
+    sample_starts: List[float] = []
     t = 0.0
     while t + SAMPLE_DURATION <= video_duration:
         sample_starts.append(t)
         t += SAMPLE_STEP
 
     total = len(sample_starts)
-    timeline: List[_TimelineEntry] = []
+    if total == 0:
+        return []
 
-    for i, start in enumerate(sample_starts):
-        if progress_callback:
-            progress_callback(i, total, start)
+    # Decode WAV once into memory — eliminates per-sample ffmpeg spawns and
+    # concurrent disk I/O contention.  A 2-hour 16kHz mono int16 WAV is ~230 MB.
+    sample_rate, pcm = wavfile.read(str(session_wav))
+    if pcm.ndim > 1:
+        pcm = pcm[:, 0]  # take first channel if stereo
+    pcm = pcm.astype(np.int16)
 
-        # Extract sample to a throwaway temp file, delete immediately after
-        tmp = Path(tempfile.mktemp(suffix=".wav"))
-        try:
-            extract_audio_segment(session_wav, start, SAMPLE_DURATION, tmp)
-            matches = query_clip(tmp, db_path, min_similarity=MIN_CONFIDENCE)
-            if matches:
-                timeline.append(_TimelineEntry(
-                    start=start,
-                    track=matches[0].track_name,
-                    confidence=matches[0].confidence,
-                ))
-            else:
-                timeline.append(_TimelineEntry(start=start, track=None, confidence=0.0))
-        finally:
-            tmp.unlink(missing_ok=True)
+    # Load DB once and pre-convert to numpy arrays — avoids repeated JSON reads
+    # and np.array() conversions inside each worker call.
+    index: Dict[str, np.ndarray] = preload_index(db_path)
 
-    return timeline
+    # 80% of logical cores.  libchromaprint releases the GIL during computation,
+    # so threads achieve real parallelism without disk contention.
+    max_workers = max(1, int((os.cpu_count() or 1) * 0.8))
+    completed_count = 0
+    counter_lock = threading.Lock()
+    results: Dict[float, _TimelineEntry] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_start = {
+            executor.submit(_fingerprint_sample_pcm, pcm, sample_rate, index, start): start
+            for start in sample_starts
+        }
+
+        for future in as_completed(future_to_start):
+            if cancel_event and cancel_event.is_set():
+                for f in future_to_start:
+                    f.cancel()
+                break
+
+            start = future_to_start[future]
+            try:
+                entry = future.result()
+            except Exception:
+                entry = _TimelineEntry(start=start, track=None, confidence=0.0)
+
+            results[start] = entry
+
+            with counter_lock:
+                completed_count += 1
+                count = completed_count
+
+            if progress_callback:
+                progress_callback(count, total, start)
+
+    # Reconstruct in chronological order (futures complete out of order)
+    return [results[s] for s in sample_starts if s in results]
 
 
 def find_transitions(

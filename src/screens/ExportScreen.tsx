@@ -27,6 +27,8 @@ export default function ExportScreen() {
   const [progress, setProgress] = useState({ percent: 0, message: '' })
   const [exporting, setExporting] = useState(false)
   const [done, setDone] = useState(false)
+  const [tracklist, setTracklist] = useState<string>('')
+  const [exportDir, setExportDir] = useState<string>('')
   const [error, setError] = useState('')
   const logEndRef = useRef<HTMLDivElement>(null)
 
@@ -49,10 +51,12 @@ export default function ExportScreen() {
     setDone(false)
     setError('')
     setLog([])
+    setTracklist('')
+    setExportDir('')
 
     try {
       await startExport(apiBase, sessionId, folder)
-      addLog(`Exporting ${keptCount} clip${keptCount !== 1 ? 's' : ''} to ${folder}…`)
+      addLog(`Exporting ${keptCount} clip${keptCount !== 1 ? 's' : ''}…`)
 
       connect(
         `${apiBase}/sessions/${sessionId}/export/stream`,
@@ -61,12 +65,10 @@ export default function ExportScreen() {
             setProgress({ percent: event.percent, message: event.message ?? '' })
           }
           if (event.clip_done) {
-            const { index, path, tracks } = event.clip_done
-            const trackStr = tracks.map((t) => t.track_name).join(' → ')
-            addLog(
-              `clip_${String(index + 1).padStart(3, '0')}.mp4 — ${trackStr || 'unidentified'}`,
-              'success'
-            )
+            const { rank, tracks } = event.clip_done
+            const clipName = rank != null ? `Clip ${rank}` : `Clip ${event.clip_done.index + 1}`
+            const trackStr = tracks.map((t: any) => t.track_name).join(' → ')
+            addLog(`${clipName}.mp4  —  ${trackStr || 'unidentified'}`, 'success')
           }
           if (event.error) {
             setError(event.error)
@@ -77,6 +79,8 @@ export default function ExportScreen() {
             addLog('Export complete. tracklist.txt written.', 'success')
             setExporting(false)
             setDone(true)
+            if (event.tracklist) setTracklist(event.tracklist)
+            if (event.export_dir) setExportDir(event.export_dir)
           }
           if (event.cancelled) {
             addLog('Export cancelled.', 'info')
@@ -99,7 +103,8 @@ export default function ExportScreen() {
   }
 
   const openFolder = () => {
-    if (folder && window.electronAPI) window.electronAPI.openFolder(folder)
+    const dir = exportDir || folder
+    if (dir && window.electronAPI) window.electronAPI.openFolder(dir)
   }
 
   return (
@@ -138,26 +143,31 @@ export default function ExportScreen() {
               </button>
             )}
           </div>
+          {exportDir && done && (
+            <p className="text-[10px] text-muted">Saved to: <span className="text-foreground">{exportDir}</span></p>
+          )}
         </div>
 
         {/* Export button */}
-        <button
-          onClick={handleExport}
-          disabled={!folder || exporting || keptCount === 0}
-          className="py-2.5 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent/90 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-        >
-          Export {keptCount} Clip{keptCount !== 1 ? 's' : ''}
-        </button>
+        {!done && (
+          <button
+            onClick={handleExport}
+            disabled={!folder || exporting || keptCount === 0}
+            className="py-2.5 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent/90 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+          >
+            Export {keptCount} Clip{keptCount !== 1 ? 's' : ''}
+          </button>
+        )}
 
-        {/* Log */}
+        {/* Clip log */}
         {log.length > 0 && (
-          <div className="bg-surface-raised border border-border rounded-lg p-3 max-h-64 overflow-y-auto flex flex-col gap-1">
+          <div className="bg-surface-raised border border-border rounded-lg p-3 max-h-48 overflow-y-auto flex flex-col gap-1">
             {log.map((entry, i) => (
               <span
                 key={i}
                 className={`text-xs font-mono ${
-                  entry.type === 'success' ? 'text-green-700' :
-                  entry.type === 'error' ? 'text-red-700' :
+                  entry.type === 'success' ? 'text-green-600' :
+                  entry.type === 'error' ? 'text-red-600' :
                   'text-muted'
                 }`}
               >
@@ -168,13 +178,35 @@ export default function ExportScreen() {
           </div>
         )}
 
-        {/* Open folder button — after export completes */}
+        {/* Tracklist — shown after export completes */}
+        {done && tracklist && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted font-medium uppercase tracking-wide">Tracklist</p>
+            <pre className="bg-surface-raised border border-border rounded-lg p-3 text-xs text-foreground font-mono whitespace-pre-wrap select-all leading-relaxed">
+              {tracklist}
+            </pre>
+          </div>
+        )}
+
+        {/* Post-export actions */}
+        {done && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={openFolder}
+              className="text-xs text-muted hover:text-foreground transition-colors"
+            >
+              Open in Finder →
+            </button>
+          </div>
+        )}
+
+        {/* Return button — fades in last */}
         {done && (
           <button
-            onClick={openFolder}
-            className="self-start text-xs text-muted hover:text-foreground transition-colors"
+            onClick={() => { useSessionStore.getState().reset(); navigate('/') }}
+            className="py-2.5 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent/90 transition-colors animate-fadeIn"
           >
-            Open in Finder →
+            Return to Menu
           </button>
         )}
       </div>

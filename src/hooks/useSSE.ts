@@ -1,10 +1,11 @@
 import { useCallback, useRef } from 'react'
+import { authHeader } from '../api/client'
 import type { ProgressEvent } from '../types'
 
 type SSECallback = (event: ProgressEvent) => void
 
 export function useSSE() {
-  const esRef = useRef<EventSource | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const connect = useCallback((
     url: string,
@@ -12,39 +13,60 @@ export function useSSE() {
     onClose?: () => void,
     isTerminal?: (event: ProgressEvent) => boolean,
   ) => {
-    // Close any existing connection
-    esRef.current?.close()
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
 
-    const es = new EventSource(url)
-    esRef.current = es
-
-    es.onmessage = (e) => {
+    ;(async () => {
       try {
-        const data: ProgressEvent = JSON.parse(e.data)
-        onEvent(data)
-        const terminal = isTerminal
-          ? isTerminal(data)
-          : (!!data.done || !!data.error || !!data.cancelled)
-        if (terminal) {
-          es.close()
-          esRef.current = null
-          onClose?.()
-        }
-      } catch {
-        // ignore parse errors
-      }
-    }
+        const res = await fetch(url, {
+          headers: { ...authHeader(), Accept: 'text/event-stream' },
+          signal: controller.signal,
+        })
 
-    es.onerror = () => {
-      es.close()
-      esRef.current = null
-      onClose?.()
-    }
+        if (!res.ok || !res.body) return
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buf += decoder.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop() ?? ''
+
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue
+            const raw = line.slice(5).trim()
+            if (!raw) continue
+            try {
+              const data: ProgressEvent = JSON.parse(raw)
+              onEvent(data)
+              const terminal = isTerminal
+                ? isTerminal(data)
+                : (!!data.done || !!data.error || !!data.cancelled)
+              if (terminal) {
+                controller.abort()
+                onClose?.()
+                return
+              }
+            } catch {
+              // ignore parse errors
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') onClose?.()
+      }
+    })()
   }, [])
 
   const close = useCallback(() => {
-    esRef.current?.close()
-    esRef.current = null
+    abortRef.current?.abort()
+    abortRef.current = null
   }, [])
 
   return { connect, close }

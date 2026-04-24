@@ -13,5 +13,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getApiBase: (): Promise<string> =>
     ipcRenderer.invoke('api:getBase'),
 
+  getToken: (): Promise<string> =>
+    ipcRenderer.invoke('api:getToken'),
+
   platform: (): string => process.platform,
 })
