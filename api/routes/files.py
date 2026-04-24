@@ -44,16 +44,19 @@ def validate_video(body: dict):
     if not video_path.exists():
         raise HTTPException(status_code=400, detail="File not found")
 
-    result = subprocess.run(
-        [
-            "ffprobe", "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
-            str(video_path),
-        ],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail="ffprobe not found — install ffmpeg (brew install ffmpeg)")
     if result.returncode != 0:
         raise HTTPException(status_code=400, detail="Not a valid video file")
 
