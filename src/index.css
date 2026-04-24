@@ -16,7 +16,7 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: #bbb5ae;
+  background: #c5bfb8;
   color: #1e1a18;
   font-family: 'Inter', -apple-system, 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -35,13 +35,18 @@ html, body, #root {
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #7a7470;
+  background: #636060;
 }
 
 /* Turntable platter rotation */
 @keyframes platter-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes platter-spin-reverse {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
 }
 
 /* Electron drag region */
@@ -80,7 +85,7 @@ input[type="range"] {
 
 input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
-  background: #7a7470;
+  background: #636060;
   border-radius: 2px;
 }
 
@@ -104,7 +109,7 @@ input[type="range"]:focus {
 
 input[type="range"]::-moz-range-track {
   height: 4px;
-  background: #7a7470;
+  background: #636060;
   border-radius: 2px;
 }
 

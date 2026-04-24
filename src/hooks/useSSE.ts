@@ -6,7 +6,12 @@ type SSECallback = (event: ProgressEvent) => void
 export function useSSE() {
   const esRef = useRef<EventSource | null>(null)
 
-  const connect = useCallback((url: string, onEvent: SSECallback, onClose?: () => void) => {
+  const connect = useCallback((
+    url: string,
+    onEvent: SSECallback,
+    onClose?: () => void,
+    isTerminal?: (event: ProgressEvent) => boolean,
+  ) => {
     // Close any existing connection
     esRef.current?.close()
 
@@ -17,7 +22,10 @@ export function useSSE() {
       try {
         const data: ProgressEvent = JSON.parse(e.data)
         onEvent(data)
-        if (data.done || data.error || data.cancelled) {
+        const terminal = isTerminal
+          ? isTerminal(data)
+          : (!!data.done || !!data.error || !!data.cancelled)
+        if (terminal) {
           es.close()
           esRef.current = null
           onClose?.()

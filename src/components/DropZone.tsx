@@ -8,9 +8,11 @@ interface DropZoneProps {
   value: string | null
   onChange: (path: string) => void
   error?: boolean
+  errorMessage?: string
+  style?: React.CSSProperties
 }
 
-export default function DropZone({ label, sublabel, accept, value, onChange, error }: DropZoneProps) {
+export default function DropZone({ label, sublabel, accept, value, onChange, error, errorMessage, style }: DropZoneProps) {
   const apiBase = useSessionStore((s) => s.apiBase)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -47,6 +49,7 @@ export default function DropZone({ label, sublabel, accept, value, onChange, err
       onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
+      style={style}
       className={`
         relative flex flex-col items-center justify-center gap-1
         h-24 rounded-lg border-2 cursor-pointer
@@ -75,6 +78,12 @@ export default function DropZone({ label, sublabel, accept, value, onChange, err
         <>
           <span className="text-xs text-foreground font-medium truncate max-w-[90%]">{filename}</span>
           <span className="text-[10px] text-muted">{label}</span>
+          {errorMessage && <span className="text-[10px] text-red-600 text-center px-2 mt-0.5">{errorMessage}</span>}
+        </>
+      ) : errorMessage ? (
+        <>
+          <span className="text-xs text-red-600 text-center px-2">{errorMessage}</span>
+          <span className="text-[11px] text-muted/70 mt-1">or click to browse</span>
         </>
       ) : (
         <>

@@ -12,11 +12,11 @@ function createWindow(port: number): void {
 
   mainWindow = new BrowserWindow({
     width: 1280,
-    height: 840,
-    minWidth: 960,
-    minHeight: 640,
+    height: 920,
+    minWidth: 1024,
+    minHeight: 840,
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
-    backgroundColor: '#bbb5ae',
+    backgroundColor: '#c5bfb8',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

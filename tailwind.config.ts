@@ -6,7 +6,7 @@ export default {
     extend: {
       colors: {
         surface: {
-          DEFAULT: '#bbb5ae',
+          DEFAULT: '#c5bfb8',
           raised: '#c8c2bb',
           high: '#a8a29b',
         },
@@ -17,7 +17,7 @@ export default {
           orangeDark: '#703a1e',
         },
         foreground: '#1e1a18',
-        muted: '#7a7470',
+        muted: '#636060',
         border: '#9a9490',
       },
       fontFamily: {
