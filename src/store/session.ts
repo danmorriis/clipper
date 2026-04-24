@@ -9,6 +9,7 @@ interface SessionStore {
   // Session
   sessionId: string | null
   videoPath: string | null
+  playlistPath: string | null
   videoDuration: number
   candidates: ClipCandidate[]
   allCandidatesCount: number
@@ -33,9 +34,11 @@ interface SessionStore {
     resolved_track_names: string[]
     output_dir: string | null
   }) => void
+  setPlaylistPath: (path: string | null) => void
   setCandidates: (candidates: ClipCandidate[]) => void
   updateCandidate: (rank: number, patch: Partial<ClipCandidate>) => void
   addCandidates: (newOnes: ClipCandidate[]) => void
+  setNextAllIdx: (idx: number) => void
   selectCard: (rank: number | null) => void
   reset: () => void
 }
@@ -46,6 +49,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   sessionId: null,
   videoPath: null,
+  playlistPath: null,
   videoDuration: 0,
   candidates: [],
   allCandidatesCount: 0,
@@ -77,6 +81,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       outputDir: s.output_dir,
     }),
 
+  setPlaylistPath: (path) => set({ playlistPath: path }),
+
   setCandidates: (candidates) => set({ candidates }),
 
   updateCandidate: (rank, patch) =>
@@ -94,6 +100,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return { candidates: merged }
     }),
 
+  setNextAllIdx: (idx) => set({ nextAllIdx: idx }),
+
   selectCard: (rank) =>
     set((state) => {
       if (rank === null) return { selectedRank: null }
@@ -106,6 +114,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set({
       sessionId: null,
       videoPath: null,
+      playlistPath: null,
       videoDuration: 0,
       candidates: [],
       allCandidatesCount: 0,

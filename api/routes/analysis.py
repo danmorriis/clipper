@@ -46,14 +46,20 @@ async def stream_analysis(session_id: str):
 
     async def event_gen():
         q = entry.analysis_queue
-        loop = asyncio.get_event_loop()
+        last_ping = asyncio.get_event_loop().time()
+
         while True:
             try:
                 event = q.get_nowait()
             except queue.Empty:
+                now = asyncio.get_event_loop().time()
+                if now - last_ping >= 15:
+                    yield {"comment": "keepalive"}
+                    last_ping = now
                 await asyncio.sleep(0.1)
                 continue
 
+            last_ping = asyncio.get_event_loop().time()
             yield {"data": json.dumps(event)}
 
             if event.get("done"):
@@ -72,9 +78,14 @@ async def stream_analysis(session_id: str):
             try:
                 event = q.get_nowait()
             except queue.Empty:
+                now = asyncio.get_event_loop().time()
+                if now - last_ping >= 15:
+                    yield {"comment": "keepalive"}
+                    last_ping = now
                 await asyncio.sleep(0.1)
                 continue
 
+            last_ping = asyncio.get_event_loop().time()
             yield {"data": json.dumps(event)}
 
             if "thumbnails_done" in event or event.get("error") or event.get("cancelled"):

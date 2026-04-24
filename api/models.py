@@ -29,6 +29,11 @@ class ClipCandidateOut(BaseModel):
     post_track: Optional[str]
 
 
+class GenerateMoreOut(BaseModel):
+    candidates: List[ClipCandidateOut]
+    next_all_idx: int
+
+
 class SessionOut(BaseModel):
     session_id: str
     video_path: Optional[str]

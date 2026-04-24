@@ -30,6 +30,7 @@ export default function ExportScreen() {
   const [tracklist, setTracklist] = useState<string>('')
   const [exportDir, setExportDir] = useState<string>('')
   const [error, setError] = useState('')
+  const [fadingOut, setFadingOut] = useState(false)
   const logEndRef = useRef<HTMLDivElement>(null)
 
   const keptCount = candidates.filter((c) => c.kept).length
@@ -108,7 +109,10 @@ export default function ExportScreen() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-surface">
+    <div
+      className="flex flex-col h-full bg-surface transition-opacity duration-700"
+      style={{ opacity: fadingOut ? 0 : 1 }}
+    >
       <TitleBarSpacer />
 
       <div className="flex-1 overflow-y-auto px-8 py-4 flex flex-col gap-5 max-w-lg mx-auto w-full">
@@ -203,7 +207,10 @@ export default function ExportScreen() {
         {/* Return button — fades in last */}
         {done && (
           <button
-            onClick={() => { useSessionStore.getState().reset(); navigate('/') }}
+            onClick={() => {
+              setFadingOut(true)
+              setTimeout(() => { useSessionStore.getState().reset(); navigate('/') }, 700)
+            }}
             className="py-2.5 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent/90 transition-colors animate-fadeIn"
           >
             Return to Menu

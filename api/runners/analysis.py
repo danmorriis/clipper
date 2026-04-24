@@ -125,11 +125,11 @@ def run_analysis(
 
 
 def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
-    _emit(q, 12, "Resolving playlist tracks…")
     found_paths, missing = resolve_playlist(
         session.playlist_path,
         session.search_root,
-        progress_callback=lambda cur, tot, name: _emit(q, 12, f"Resolving tracks… {cur + 1}/{tot}"),
+        on_index_start=lambda: _emit(q, 12, "Scanning music folder…"),
+        progress_callback=lambda cur, tot, name: _emit(q, 13, f"Resolving tracks… {cur + 1}/{tot}"),
     )
     if cancel_event.is_set():
         _cleanup(session_dir)
@@ -140,18 +140,17 @@ def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
         _emit(q, 14, "No tracks resolved — falling back to spectral…")
         return _run_spectral_mode(session, wav_path, cancel_event, q)
 
-    # Store ALL track names from the playlist (not just found files) so the
-    # review-screen track-edit dropdowns are fully populated.
-    from dj_clipper.core.playlist_resolver import parse_playlist
-    all_playlist_names = parse_playlist(session.playlist_path)
-    session.resolved_track_names = sorted(set(all_playlist_names)) if all_playlist_names else sorted(p.stem for p in found_paths)
+    # resolved_track_names is populated after timeline scanning (video appearance order).
+    # Set a placeholder here; it will be overwritten after build_track_timeline.
 
     if missing:
         _emit(q, 14, f"Warning: {len(missing)} track(s) not found on disk")
 
-    _emit(q, 15, f"Building fingerprint index ({len(found_paths)} tracks)…")
     db_path = session_dir / "tracklist.json"
-    build_index(found_paths, db_path)
+    build_index(
+        found_paths, db_path,
+        progress_callback=lambda done, tot, name: _emit(q, 15 + int((done / max(tot, 1)) * 4), f"Fingerprinting tracks… {done}/{tot}"),
+    )
     session.db_path = db_path
     if cancel_event.is_set():
         _cleanup(session_dir)
@@ -170,7 +169,7 @@ def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
         pct = 20 + int((cur / max(tot, 1)) * 55)
         _emit(q, pct, f"Collecting… {cur}/{tot} crumbs")
 
-    timeline = build_track_timeline(
+    tl_result = build_track_timeline(
         wav_path, db_path, session.video_duration,
         progress_callback=timeline_progress,
         cancel_event=cancel_event,
@@ -181,11 +180,28 @@ def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
         q.put({"cancelled": True, "done": True})
         return None
 
+    session.timeline = list(tl_result.timeline)
+
+    # Order track names by first appearance in the video, then append any
+    # playlist tracks that were never identified in the session.
+    seen: set = set()
+    ordered: list = []
+    for entry in tl_result.timeline:
+        if entry.track and entry.track not in seen:
+            seen.add(entry.track)
+            ordered.append(entry.track)
+    for path in found_paths:
+        if path.stem not in seen:
+            ordered.append(path.stem)
+    session.resolved_track_names = ordered
+
     _emit(q, 76, "Detecting transitions…")
     candidates = find_transitions(
-        timeline,
+        tl_result.timeline,
         clip_duration=session.settings.clip_duration,
         video_duration=session.video_duration,
+        pcm=tl_result.pcm,
+        sample_rate=tl_result.sample_rate,
     )
 
     if not candidates:
@@ -205,20 +221,22 @@ def _run_timeslot_mode(session, session_dir, wav_path, cancel_event, q):
         and session.search_root and session.search_root.exists()
     )
     if playlist_ready:
-        _emit(q, 12, "Resolving playlist tracks…")
         found_paths, _ = resolve_playlist(
             session.playlist_path,
             session.search_root,
-            progress_callback=lambda cur, tot, name: _emit(q, 12, f"Resolving tracks… {cur + 1}/{tot}"),
+            on_index_start=lambda: _emit(q, 12, "Scanning music folder…"),
+            progress_callback=lambda cur, tot, name: _emit(q, 13, f"Resolving tracks… {cur + 1}/{tot}"),
         )
         if _check_cancel(cancel_event, session_dir, q):
             return None
 
         if found_paths:
             session.resolved_track_names = sorted(p.stem for p in found_paths)
-            _emit(q, 15, f"Building fingerprint index ({len(found_paths)} tracks)…")
             db_path = session_dir / "tracklist.json"
-            build_index(found_paths, db_path)
+            build_index(
+                found_paths, db_path,
+                progress_callback=lambda done, tot, name: _emit(q, 15 + int((done / max(tot, 1)) * 4), f"Fingerprinting tracks… {done}/{tot}"),
+            )
             session.db_path = db_path
             if _check_cancel(cancel_event, session_dir, q):
                 return None
@@ -232,11 +250,13 @@ def _run_timeslot_mode(session, session_dir, wav_path, cancel_event, q):
                 pct = 20 + int((cur / max(tot, 1)) * 55)
                 _emit(q, pct, f"Collecting… {cur}/{tot} crumbs")
 
-            timeline = build_track_timeline(
+            tl_result = build_track_timeline(
                 wav_path, db_path, session.video_duration,
                 progress_callback=timeline_progress,
                 cancel_event=cancel_event,
             )
+            timeline = tl_result.timeline
+            session.timeline = list(timeline)
             if cancelled_flag[0] or _check_cancel(cancel_event, session_dir, q):
                 return None
 

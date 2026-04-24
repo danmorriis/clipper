@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ClipCandidate } from '../types'
 
 interface TrackEditModalProps {
@@ -6,6 +6,63 @@ interface TrackEditModalProps {
   trackNames: string[]
   onSave: (pre: string, post: string) => void
   onClose: () => void
+}
+
+function TrackCombobox({
+  value,
+  onChange,
+  trackNames,
+  placeholder,
+  id,
+}: {
+  value: string
+  onChange: (v: string) => void
+  trackNames: string[]
+  placeholder: string
+  id: string
+}) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={containerRef} className="relative" id={id}>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        placeholder={placeholder}
+        autoComplete="off"
+        className="w-full bg-surface-high border border-border rounded px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-foreground"
+      />
+      {open && trackNames.length > 0 && (
+        <div className="absolute z-50 top-full mt-0.5 left-0 right-0 bg-surface-raised border border-border rounded shadow-lg max-h-48 overflow-y-auto">
+          {trackNames.map((t) => (
+            <div
+              key={t}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                onChange(t)
+                setOpen(false)
+              }}
+              className={`px-2.5 py-1.5 text-xs cursor-pointer hover:bg-surface-high ${value === t ? 'text-foreground font-medium' : 'text-muted'}`}
+            >
+              {t}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function TrackEditModal({ candidate, trackNames, onSave, onClose }: TrackEditModalProps) {
@@ -22,30 +79,24 @@ export default function TrackEditModal({ candidate, trackNames, onSave, onClose 
 
         <label className="flex flex-col gap-1">
           <span className="text-xs text-muted">Track Before</span>
-          <input
-            list={`track-names-${candidate.rank}-pre`}
+          <TrackCombobox
+            id={`track-pre-${candidate.rank}`}
             value={pre}
-            onChange={(e) => setPre(e.target.value)}
+            onChange={setPre}
+            trackNames={trackNames}
             placeholder="Artist - Track name"
-            className="bg-surface-high border border-border rounded px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-foreground"
           />
-          <datalist id={`track-names-${candidate.rank}-pre`}>
-            {trackNames.map((t) => <option key={t} value={t} />)}
-          </datalist>
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="text-xs text-muted">Track After</span>
-          <input
-            list={`track-names-${candidate.rank}-post`}
+          <TrackCombobox
+            id={`track-post-${candidate.rank}`}
             value={post}
-            onChange={(e) => setPost(e.target.value)}
+            onChange={setPost}
+            trackNames={trackNames}
             placeholder="Artist - Track name"
-            className="bg-surface-high border border-border rounded px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-foreground"
           />
-          <datalist id={`track-names-${candidate.rank}-post`}>
-            {trackNames.map((t) => <option key={t} value={t} />)}
-          </datalist>
         </label>
 
         <div className="flex gap-2 justify-end">

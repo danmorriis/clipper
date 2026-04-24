@@ -9,8 +9,9 @@ import { useCallback, useRef } from 'react'
 
 const BAR_TOP = 14
 const BAR_H = 34
-const HANDLE_W = 14
+const HANDLE_W = 8
 const HIT_R = 20
+const MOVE_TAB_R = 14   // half-width of the centre drag tab (28 px total — always clickable)
 const MIN_CLIP = 15
 
 function fmtTs(t: number): string {
@@ -64,14 +65,14 @@ export default function TrimBar({
 
   const tToX = useCallback((t: number, w: number) => {
     const span = ctxEnd - ctxStart
-    if (span <= 0) return HANDLE_W / 2
-    return HANDLE_W / 2 + ((t - ctxStart) / span) * (w - HANDLE_W)
+    if (span <= 0) return HANDLE_W
+    return HANDLE_W + ((t - ctxStart) / span) * (w - 2 * HANDLE_W)
   }, [ctxEnd, ctxStart])
 
   const xToT = useCallback((x: number, w: number) => {
-    const usable = w - HANDLE_W
+    const usable = w - 2 * HANDLE_W
     if (usable <= 0) return ctxStart
-    const frac = (x - HANDLE_W / 2) / usable
+    const frac = (x - HANDLE_W) / usable
     return Math.max(ctxStart, Math.min(ctxEnd, ctxStart + frac * (ctxEnd - ctxStart)))
   }, [ctxEnd, ctxStart])
 
@@ -83,10 +84,20 @@ export default function TrimBar({
     const w = rect.width
     const sx = tToX(trimStart, w)
     const ex = tToX(trimEnd, w)
+    const midX = (sx + ex) / 2
     const ds = Math.abs(x - sx)
     const de = Math.abs(x - ex)
 
-    if (ds < HIT_R && ds <= de) {
+    // Centre drag tab is checked first — it is always a fixed 28 px wide so it
+    // remains clickable even when the clip region is only a few pixels wide.
+    if (Math.abs(x - midX) < MOVE_TAB_R) {
+      dragRef.current = {
+        type: 'bar',
+        originT: xToT(x, w),
+        originStart: trimStart,
+        originEnd: trimEnd,
+      }
+    } else if (ds < HIT_R && ds <= de) {
       dragRef.current = { type: 'start', originT: 0, originStart: 0, originEnd: 0 }
     } else if (de < HIT_R) {
       dragRef.current = { type: 'end', originT: 0, originStart: 0, originEnd: 0 }
@@ -158,16 +169,17 @@ export default function TrimBar({
   const w = width || 600
   const sx = tToX(trimStart, w)
   const ex = tToX(trimEnd, w)
+  const midX = (sx + ex) / 2
   const phx = tToX(Math.max(ctxStart, Math.min(ctxEnd, playhead)), w)
   const midY = BAR_TOP + BAR_H / 2
 
   const fillColor = unlocked ? '#703a1e' : '#a8a29b'
   const borderColor = unlocked ? '#ff9a4a' : '#1e1a18'
 
-  // Handle label positions
+  // Handle label positions — centred on each handle's midpoint
   const lblW = 64
-  const lx = Math.max(0, Math.min(sx - lblW / 2, w - lblW))
-  const rx = Math.max(lx + lblW + 4, Math.min(ex - lblW / 2, w - lblW))
+  const lx = Math.max(0, Math.min(sx - HANDLE_W / 2 - lblW / 2, w - lblW))
+  const rx = Math.max(lx + lblW + 4, Math.min(ex + HANDLE_W / 2 - lblW / 2, w - lblW))
 
   // Thumbnail frame timestamps every 30 s across the context window
   const THUMB_STEP = 30
@@ -186,7 +198,7 @@ export default function TrimBar({
     >
       <defs>
         <clipPath id="trimbar-clip">
-          <rect x={HANDLE_W / 2} y={BAR_TOP} width={Math.max(0, w - HANDLE_W)} height={BAR_H} rx={4} />
+          <rect x={HANDLE_W} y={BAR_TOP} width={Math.max(0, w - 2 * HANDLE_W)} height={BAR_H} rx={4} />
         </clipPath>
       </defs>
 
@@ -195,7 +207,7 @@ export default function TrimBar({
       <text x={w} y={11} fontSize={9} fill="#555555" textAnchor="end">{fmtTs(ctxEnd)}</text>
 
       {/* Background track — dark fallback while thumbnails load */}
-      <rect x={HANDLE_W / 2} y={BAR_TOP} width={Math.max(0, w - HANDLE_W)} height={BAR_H} rx={4} fill="#1a1a1a" />
+      <rect x={HANDLE_W} y={BAR_TOP} width={Math.max(0, w - 2 * HANDLE_W)} height={BAR_H} rx={4} fill="#1a1a1a" />
 
       {/* Thumbnail strip */}
       {getFrameUrl && (
@@ -218,12 +230,12 @@ export default function TrimBar({
         </g>
       )}
 
-      {/* Dim outside the clip region */}
-      {sx > HANDLE_W / 2 && (
-        <rect x={HANDLE_W / 2} y={BAR_TOP} width={sx - HANDLE_W / 2} height={BAR_H} fill="rgba(0,0,0,0.62)" clipPath="url(#trimbar-clip)" />
+      {/* Dim outside the clip region — left and right of selection */}
+      {sx > HANDLE_W && (
+        <rect x={HANDLE_W} y={BAR_TOP} width={sx - HANDLE_W} height={BAR_H} fill="rgba(0,0,0,0.62)" clipPath="url(#trimbar-clip)" />
       )}
-      {ex < w - HANDLE_W / 2 && (
-        <rect x={ex} y={BAR_TOP} width={w - HANDLE_W / 2 - ex} height={BAR_H} fill="rgba(0,0,0,0.62)" clipPath="url(#trimbar-clip)" />
+      {ex < w - HANDLE_W && (
+        <rect x={ex} y={BAR_TOP} width={w - HANDLE_W - ex} height={BAR_H} fill="rgba(0,0,0,0.62)" clipPath="url(#trimbar-clip)" />
       )}
 
       {/* Tint the clip region when unlocked (orange hue) */}
@@ -234,16 +246,37 @@ export default function TrimBar({
       {/* Border around clip region */}
       <rect x={sx} y={BAR_TOP} width={Math.max(0, ex - sx)} height={BAR_H} fill="none" stroke={borderColor} strokeWidth={1} />
 
-      {/* Start handle */}
-      <rect x={sx - HANDLE_W / 2} y={BAR_TOP} width={HANDLE_W} height={BAR_H} rx={4} fill="#ffffff" />
-      {/* End handle */}
-      <rect x={ex - HANDLE_W / 2} y={BAR_TOP} width={HANDLE_W} height={BAR_H} rx={4} fill="#ffffff" />
+      {/* Centre drag tab — fixed 28 px wide so it stays grabbable on narrow clips */}
+      <rect
+        x={midX - MOVE_TAB_R}
+        y={midY - 7}
+        width={MOVE_TAB_R * 2}
+        height={14}
+        rx={3}
+        fill="rgba(255,255,255,0.18)"
+        stroke="rgba(255,255,255,0.30)"
+        strokeWidth={0.5}
+      />
+      {[-4, 0, 4].map((dx) => (
+        <line
+          key={dx}
+          x1={midX + dx} y1={midY - 4}
+          x2={midX + dx} y2={midY + 4}
+          stroke="rgba(255,255,255,0.55)"
+          strokeWidth={0.75}
+        />
+      ))}
 
-      {/* Grip dots */}
+      {/* Start handle — sits outside (left of) the clip region */}
+      <rect x={sx - HANDLE_W} y={BAR_TOP} width={HANDLE_W} height={BAR_H} rx={2} fill="#ffffff" />
+      {/* End handle — sits outside (right of) the clip region */}
+      <rect x={ex} y={BAR_TOP} width={HANDLE_W} height={BAR_H} rx={2} fill="#ffffff" />
+
+      {/* Grip dots — centred on each handle */}
       {[-5, 0, 5].map((dy) => (
         <g key={dy}>
-          <ellipse cx={sx} cy={midY + dy} rx={2} ry={1.5} fill="#666" />
-          <ellipse cx={ex} cy={midY + dy} rx={2} ry={1.5} fill="#666" />
+          <ellipse cx={sx - HANDLE_W / 2} cy={midY + dy} rx={1.5} ry={1.5} fill="#666" />
+          <ellipse cx={ex + HANDLE_W / 2} cy={midY + dy} rx={1.5} ry={1.5} fill="#666" />
         </g>
       ))}
 

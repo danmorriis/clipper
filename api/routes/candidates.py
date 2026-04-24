@@ -1,9 +1,9 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 
 from api import session_store
-from api.models import AddManualClipIn, ClipCandidateOut, PatchCandidateIn, candidate_to_out
+from api.models import AddManualClipIn, ClipCandidateOut, GenerateMoreOut, PatchCandidateIn, candidate_to_out
 from dj_clipper.config import THUMBNAIL_SEEK_OFFSET
 from dj_clipper.core.clip_exporter import extract_thumbnail
 from dj_clipper.models.clip_model import ClipCandidate
@@ -93,11 +93,12 @@ def add_manual_clip(session_id: str, body: AddManualClipIn):
     return candidate_to_out(new_clip)
 
 
-@router.post("/{session_id}/generate-more", response_model=List[ClipCandidateOut])
+@router.post("/{session_id}/generate-more", response_model=GenerateMoreOut)
 def generate_more(session_id: str, count: int = 5):
     """
     Surface the next batch of clips from all_candidates pool.
-    Returns the newly added candidates (they are appended to session.candidates).
+    Returns the newly added candidates and the updated next_all_idx so the
+    frontend can update only that field without a full session refresh.
     """
     entry = session_store.get(session_id)
     if not entry:
@@ -106,14 +107,14 @@ def generate_more(session_id: str, count: int = 5):
     state = entry.state
     pool = state.all_candidates
     idx = entry.next_all_idx
-    current_ranks = {c.transition_peak_time for c in state.candidates}
+    current_peaks = {c.transition_peak_time for c in state.candidates}
 
     added = []
     while len(added) < count and idx < len(pool):
         candidate = pool[idx]
         idx += 1
-        if candidate.transition_peak_time not in current_ranks:
-            current_ranks.add(candidate.transition_peak_time)
+        if candidate.transition_peak_time not in current_peaks:
+            current_peaks.add(candidate.transition_peak_time)
             added.append(candidate)
 
     entry.next_all_idx = idx
@@ -125,18 +126,39 @@ def generate_more(session_id: str, count: int = 5):
     if added:
         _generate_thumbnails(entry.state, added)
 
-    return [candidate_to_out(c) for c in added]
+    return GenerateMoreOut(
+        candidates=[candidate_to_out(c) for c in added],
+        next_all_idx=entry.next_all_idx,
+    )
 
 
 @router.get("/{session_id}/identify-at")
-def identify_at(session_id: str, t: float):
+def identify_at(
+    session_id: str,
+    t: float,
+    side: Optional[str] = None,          # 'pre' or 'post'
+    hint_track: Optional[str] = None,
+    hint_position: Optional[str] = None,  # 'pre' or 'post'
+):
     """
-    Fingerprint the audio at timestamp t (seconds) and return the best-matching
-    track name from the session's fingerprint DB. Used for live track labelling
-    during custom clip creation.
+    Identify the track playing at timestamp t.
+
+    Primary: if the session has a stored fingerprint timeline and `side` is
+    provided, use confirm_track_near to find the closest confirmed pair of
+    adjacent timeline samples on the relevant side of t — this is the most
+    reliable approach since the timeline was already fingerprinted at analysis
+    time.
+
+    Secondary: live fpcalc fingerprint of the 20 s window around t, compared
+    against the full index.
+
+    Fallback: targeted neighbour search using hint_track/hint_position (the
+    track on the opposite side of the transition), which constrains the search
+    to the expected adjacent playlist entry with a relaxed threshold.
     """
     import json
     from dj_clipper.core.fingerprint_db import fpcalc_piped, query_clip_preloaded
+    from dj_clipper.core.transition_finder import confirm_track_near
 
     entry = session_store.get(session_id)
     if not entry:
@@ -148,8 +170,14 @@ def identify_at(session_id: str, t: float):
     if not state.db_path or not state.db_path.exists():
         return {"track": None, "confidence": 0.0}
 
+    # ── Primary: timeline-based pair confirmation ─────────────────────────────
+    if side and state.timeline:
+        track, confidence = confirm_track_near(state.timeline, t, side)
+        if track is not None:
+            return {"track": track, "confidence": round(confidence, 3)}
+
+    # ── Secondary: live fpcalc fingerprint ───────────────────────────────────
     index = json.loads(state.db_path.read_text())
-    # Sample 20 s centered on t so we capture the dominant track
     sample_start = max(0.0, t - 10.0)
     fp = fpcalc_piped(state.wav_path, sample_start, 20.0)
     if not fp:
@@ -158,4 +186,25 @@ def identify_at(session_id: str, t: float):
     matches = query_clip_preloaded(fp, index, min_similarity=0.55)
     if matches:
         return {"track": matches[0].track_name, "confidence": round(matches[0].confidence, 3)}
+
+    # ── Fallback: targeted neighbour search ───────────────────────────────────
+    if hint_track and hint_position and state.resolved_track_names:
+        names = state.resolved_track_names
+        if hint_track in names:
+            idx = names.index(hint_track)
+            neighbor = None
+            if hint_position == "post" and idx > 0:
+                neighbor = names[idx - 1]
+            elif hint_position == "pre" and idx < len(names) - 1:
+                neighbor = names[idx + 1]
+
+            if neighbor and neighbor in index:
+                targeted = query_clip_preloaded(
+                    fp,
+                    {neighbor: index[neighbor]},
+                    min_similarity=0.45,
+                )
+                if targeted:
+                    return {"track": targeted[0].track_name, "confidence": round(targeted[0].confidence, 3)}
+
     return {"track": None, "confidence": 0.0}

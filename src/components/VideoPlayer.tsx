@@ -69,7 +69,8 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
     pendingTrimRef.current = { start: 0, end: defaultClipDuration }
     setAddPreTrack(null)
     setAddPostTrack(null)
-    maxClipRef.current = Infinity
+    setUnlocked(false)
+    maxClipRef.current = 60
     const video = videoRef.current
     if (video) { video.pause(); video.currentTime = 0; setCurrentTime(0); setPlaying(false) }
   }, [addClipMode, defaultClipDuration])
@@ -251,12 +252,30 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
   const handleAddClipCommit = async (start: number, end: number) => {
     pendingTrimRef.current = { start, end }
     if (!sessionId) return
+
+    // Round 1: timeline-based pair confirmation (primary), with side hint so
+    // the backend searches in the right direction from each handle position.
     const [preRes, postRes] = await Promise.all([
-      identifyAt(apiBase, sessionId, start).catch(() => ({ track: null })),
-      identifyAt(apiBase, sessionId, end).catch(() => ({ track: null })),
+      identifyAt(apiBase, sessionId, start, { side: 'pre' }).catch(() => ({ track: null })),
+      identifyAt(apiBase, sessionId, end, { side: 'post' }).catch(() => ({ track: null })),
     ])
-    setAddPreTrack(preRes.track)
-    setAddPostTrack(postRes.track)
+
+    let preTrack = preRes.track
+    let postTrack = postRes.track
+
+    // Round 2: if one side is still unknown, use the known side's position in
+    // the ordered playlist to target just its immediate neighbour and retry with
+    // a relaxed threshold.
+    if (!preTrack && postTrack) {
+      const hinted = await identifyAt(apiBase, sessionId, start, { side: 'pre', hint: { track: postTrack, position: 'post' } }).catch(() => ({ track: null }))
+      preTrack = hinted.track
+    } else if (!postTrack && preTrack) {
+      const hinted = await identifyAt(apiBase, sessionId, end, { side: 'post', hint: { track: preTrack, position: 'pre' } }).catch(() => ({ track: null }))
+      postTrack = hinted.track
+    }
+
+    setAddPreTrack(preTrack)
+    setAddPostTrack(postTrack)
   }
 
   const handleConfirmAddClip = () => {
@@ -387,7 +406,7 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
             trimStart={trimStart}
             trimEnd={trimEnd}
             playhead={currentTime}
-            unlocked={addClipMode ? true : unlocked}
+            unlocked={unlocked}
             maxClip={maxClipRef.current}
             getFrameUrl={getFrameUrl}
             onTrimChange={handleTrimChange}
@@ -398,8 +417,8 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
             onSeek={(t) => { if (videoRef.current) videoRef.current.currentTime = t }}
           />
 
-          {/* Lock button — only in regular edit mode */}
-          {editMode && (
+          {/* Lock button — in both edit and add-clip modes */}
+          {(editMode || addClipMode) && (
             <div className="flex justify-center">
               <button
                 onClick={handleLockToggle}

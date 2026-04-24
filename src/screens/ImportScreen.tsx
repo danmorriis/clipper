@@ -22,10 +22,13 @@ const DURATIONS = [30, 45, 60]
 const TS_RE = /^\d{1,2}:\d{2}(:\d{2})?$/
 
 export default function ImportScreen() {
-  const { apiBase, setSession, setCandidates } = useSessionStore((s) => ({
+  const { apiBase, setSession, setCandidates, storedVideoPath, storedPlaylistPath, setPlaylistPathInStore } = useSessionStore((s) => ({
     apiBase: s.apiBase,
     setSession: s.setSession,
     setCandidates: s.setCandidates,
+    storedVideoPath: s.videoPath,
+    storedPlaylistPath: s.playlistPath,
+    setPlaylistPathInStore: s.setPlaylistPath,
   }))
   const navigate = useNavigate()
   const { connect, close } = useSSE()
@@ -44,11 +47,24 @@ export default function ImportScreen() {
   const [progress, setProgress] = useState({ percent: 0, message: '' })
   const [analysing, setAnalysing] = useState(false)
   const [fadingOut, setFadingOut] = useState(false)
+  const [fadingIn, setFadingIn] = useState(true)
   const [progressError, setProgressError] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
 
   const isMac = window.electronAPI?.platform() === 'darwin'
   const titleBarHeight = isMac ? 32 : 0
+
+  useEffect(() => {
+    const id = setTimeout(() => setFadingIn(false), 50)
+    return () => clearTimeout(id)
+  }, [])
+
+  useEffect(() => {
+    if (!apiBase) return
+    if (storedVideoPath) handleVideoChange(storedVideoPath)
+    if (storedPlaylistPath) setPlaylistPath(storedPlaylistPath)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBase])
 
   useEffect(() => {
     if (!apiBase) return
@@ -108,7 +124,7 @@ export default function ImportScreen() {
     if (folder) handleSearchRootChange(folder)
   }
 
-  const canCreate = videoPath && videoDuration >= 300 && !videoError && playlistPath && (mode !== 'timeslots' || (tsText.trim() && !tsError))
+  const canCreate = videoPath && videoDuration >= 300 && !videoError && playlistPath && searchRoot && (mode !== 'timeslots' || (tsText.trim() && !tsError))
 
   const handleCreate = async () => {
     if (!canCreate) return
@@ -184,7 +200,7 @@ export default function ImportScreen() {
   return (
     <div
       className="relative isolate h-full bg-surface overflow-hidden transition-opacity duration-700"
-      style={{ opacity: fadingOut ? 0 : 1 }}
+      style={{ opacity: fadingOut || fadingIn ? 0 : 1 }}
     >
       <TurntablePlatter analysing={analysing} percent={progress.percent} />
 
@@ -339,8 +355,8 @@ export default function ImportScreen() {
                 sublabel="M3U, M3U8, TXT"
                 accept={['m3u', 'm3u8', 'txt']}
                 value={playlistPath}
-                onChange={setPlaylistPath}
-                onClear={() => setPlaylistPath(null)}
+                onChange={(p) => { setPlaylistPath(p); setPlaylistPathInStore(p) }}
+                onClear={() => { setPlaylistPath(null); setPlaylistPathInStore(null) }}
                 clearSide="left"
                 style={{ height: 220, borderRadius: '8px 8px 269px 8px', paddingBottom: 48, paddingRight: 28 }}
               />
@@ -367,7 +383,9 @@ export default function ImportScreen() {
                   <span className="text-[9px] text-muted leading-none">i</span>
                 </div>
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 px-2.5 py-2 rounded bg-foreground text-surface text-[10px] leading-relaxed opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50">
-                  Location of your music files for ID matching — top level folder on your USB or drive that contains all your music.
+                  Location of your music files for ID matching against the tracklist you provided.
+                  <br />
+                  Select the top level folder on your USB or drive that contains all your music :-)
                 </div>
               </div>
             </div>

@@ -93,7 +93,7 @@ export function generateMore(
   base: string,
   sessionId: string,
   count = 5
-): Promise<ClipCandidate[]> {
+): Promise<{ candidates: ClipCandidate[]; next_all_idx: number }> {
   return request(base, `/sessions/${sessionId}/generate-more?count=${count}`, { method: 'POST' })
 }
 
@@ -149,8 +149,17 @@ export function setSearchRoot(base: string, path: string): Promise<{ path: strin
   })
 }
 
-export function identifyAt(base: string, sessionId: string, t: number): Promise<{ track: string | null; confidence: number }> {
-  return request(base, `/sessions/${sessionId}/identify-at?t=${t}`)
+export function identifyAt(
+  base: string,
+  sessionId: string,
+  t: number,
+  opts?: { side?: 'pre' | 'post'; hint?: { track: string; position: 'pre' | 'post' } }
+): Promise<{ track: string | null; confidence: number }> {
+  const sideParam = opts?.side ? `&side=${opts.side}` : ''
+  const hintParams = opts?.hint
+    ? `&hint_track=${encodeURIComponent(opts.hint.track)}&hint_position=${opts.hint.position}`
+    : ''
+  return request(base, `/sessions/${sessionId}/identify-at?t=${t}${sideParam}${hintParams}`)
 }
 
 // ── URL helpers ───────────────────────────────────────────────────────────────

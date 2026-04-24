@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { addManualClip, generateMore, getSession } from '../api/client'
+import { addManualClip, generateMore, getSession, patchCandidate } from '../api/client'
 import ClipGrid from '../components/ClipGrid'
 import TitleBarSpacer from '../components/TitleBarSpacer'
 import VideoPlayer from '../components/VideoPlayer'
@@ -20,6 +20,7 @@ export default function ReviewScreen() {
     selectCard,
     addCandidates,
     markNewRanks,
+    setNextAllIdx,
     setSession,
   } = useSessionStore((s) => ({
     apiBase: s.apiBase,
@@ -31,6 +32,7 @@ export default function ReviewScreen() {
     selectCard: s.selectCard,
     addCandidates: s.addCandidates,
     markNewRanks: s.markNewRanks,
+    setNextAllIdx: s.setNextAllIdx,
     setSession: s.setSession,
   }))
   const storeSessionId = useSessionStore((s) => s.sessionId)
@@ -67,6 +69,7 @@ export default function ReviewScreen() {
     candidates.forEach((c) => {
       if (!c.kept) {
         useSessionStore.getState().updateCandidate(c.rank, { kept: true })
+        if (sessionId) patchCandidate(apiBase, sessionId, c.rank, { kept: true }).catch(() => {})
       }
     })
   }
@@ -75,6 +78,7 @@ export default function ReviewScreen() {
     candidates.forEach((c) => {
       if (c.kept) {
         useSessionStore.getState().updateCandidate(c.rank, { kept: false })
+        if (sessionId) patchCandidate(apiBase, sessionId, c.rank, { kept: false }).catch(() => {})
       }
     })
   }
@@ -82,9 +86,10 @@ export default function ReviewScreen() {
   const handleGenerateMore = async () => {
     if (!sessionId) return
     try {
-      const more = await generateMore(apiBase, sessionId, 5)
+      const { candidates: more, next_all_idx } = await generateMore(apiBase, sessionId, 5)
       addCandidates(more)
       markNewRanks(more.map((c) => c.rank))
+      setNextAllIdx(next_all_idx)
     } catch {}
   }
 
@@ -105,13 +110,17 @@ export default function ReviewScreen() {
 
         <div className="flex-1" />
 
-        {hasMore && (
+        {hasMore ? (
           <button
             onClick={handleGenerateMore}
             className="px-3 py-1 text-xs rounded bg-green-100 text-green-800 border border-green-300 hover:bg-green-200 transition-colors"
           >
             Generate More
           </button>
+        ) : (
+          <span className="px-3 py-1 text-xs rounded border border-border text-muted cursor-default">
+            All transitions generated
+          </span>
         )}
 
         <button onClick={keepAll} className="text-xs text-muted hover:text-foreground transition-colors">

@@ -13,6 +13,7 @@ Public interface:
 
 import ctypes
 import ctypes.util
+import os
 import json
 import re
 import subprocess
@@ -150,7 +151,7 @@ _CHUNK = 120
 # Fraction of fingerprint bits that must match for a confident identification.
 # Chromaprint bit similarity on identical clean audio is ~0.90; on processed
 # DJ audio expect 0.60–0.75. Threshold set conservatively to reduce false positives.
-MIN_BIT_SIMILARITY = 0.60
+MIN_BIT_SIMILARITY = 0.65
 
 
 def _fpcalc(audio_path: Path, length: int = 60) -> Tuple[float, List[int]]:
@@ -261,7 +262,7 @@ def query_clip_preloaded(
 
     if len(matches) >= 2:
         margin = matches[0].confidence - matches[1].confidence
-        if margin < 0.08:
+        if margin < 0.10:
             return []
 
     return matches
@@ -310,7 +311,7 @@ def _bit_similarity(a: np.ndarray, b: np.ndarray) -> float:
 def build_index(
     source: Union[Path, List[Path]],
     db_path: Path,
-    progress_callback: Optional[Callable[[int, str], None]] = None,
+    progress_callback: Optional[Callable[[int, int, str], None]] = None,
 ) -> Path:
     """
     Fingerprint audio files using Chromaprint and save to a JSON index at db_path.
@@ -319,9 +320,14 @@ def build_index(
       - a directory Path  → indexes all audio files in that directory (non-recursive)
       - a List[Path]      → indexes exactly those files
 
-    The index format is:
-      { "track_stem": [int, int, ...], ... }
+    Fingerprinting runs in parallel (one thread per logical core) since each
+    fpcalc call is an independent subprocess.
+
+    progress_callback(completed, total, track_name) is called as each track finishes.
     """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     if isinstance(source, list):
         tracks = sorted(f for f in source if f.suffix.lower() in AUDIO_EXTENSIONS)
     else:
@@ -330,17 +336,30 @@ def build_index(
             if f.suffix.lower() in AUDIO_EXTENSIONS
         ]
     if not tracks:
-        raise ValueError(f"No audio files to index")
+        raise ValueError("No audio files to index")
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     index: Dict[str, List[int]] = {}
-    for i, track in enumerate(tracks):
-        if progress_callback:
-            progress_callback(i, track.name)
-        _, fingerprint = _fpcalc(track)
-        if fingerprint:
-            index[track.stem] = fingerprint
+    lock = threading.Lock()
+    completed = 0
+
+    def _fingerprint(track: Path):
+        _, fingerprint = _fpcalc(track, length=120)
+        return track, fingerprint
+
+    with ThreadPoolExecutor(max_workers=max(1, (os.cpu_count() or 1))) as executor:
+        futures = {executor.submit(_fingerprint, t): t for t in tracks}
+        for future in as_completed(futures):
+            track, fingerprint = future.result()
+            if fingerprint:
+                with lock:
+                    index[track.stem] = fingerprint
+            with lock:
+                completed += 1
+                done = completed
+            if progress_callback:
+                progress_callback(done, len(tracks), track.name)
 
     db_path.write_text(json.dumps(index))
     return db_path
@@ -391,7 +410,7 @@ def query_clip(
     # genuine matches from "best of a bad lot" false positives.
     if len(matches) >= 2:
         margin = matches[0].confidence - matches[1].confidence
-        if margin < 0.08:
+        if margin < 0.10:
             return []
 
     return matches
