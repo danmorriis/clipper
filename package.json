@@ -12,11 +12,12 @@
     "download-bins:mac": "bash scripts/download-binaries.sh",
     "download-bins:win": "powershell -ExecutionPolicy Bypass -File scripts/download-binaries.ps1",
 
-    "dist:mac": "npm run build && npx electron-builder --mac --config electron-builder.yml",
-    "dist:win": "npm run build && npx electron-builder --win --config electron-builder.yml"
+    "dist": "bash scripts/build.sh",
+    "dist:mac": "bash scripts/build.sh --mac",
+    "dist:win": "bash scripts/build.sh --win",
+    "dist:skip-python": "bash scripts/build.sh --skip-python"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.28.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.3",
