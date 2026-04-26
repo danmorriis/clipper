@@ -365,3 +365,21 @@ def build_index(
     return db_path
 
 
+def query_clip(
+    clip_wav_path: Path,
+    db_path: Path,
+    min_similarity: float = MIN_BIT_SIMILARITY,
+) -> List[TrackMatch]:
+    """
+    Fingerprint clip_wav_path and compare against the Chromaprint index.
+    Returns TrackMatch list sorted by confidence descending.
+    """
+    if not db_path.exists():
+        return []
+    index = preload_index(db_path)
+    if not index:
+        return []
+    _, query_fp = _fpcalc(clip_wav_path)
+    if not query_fp:
+        return []
+    return query_clip_preloaded(query_fp, index, min_similarity)
