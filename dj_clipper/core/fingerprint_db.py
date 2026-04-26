@@ -373,44 +373,13 @@ def query_clip(
     """
     Fingerprint clip_wav_path and compare against the Chromaprint index.
     Returns TrackMatch list sorted by confidence descending.
-
-    confidence = peak bit similarity (0.0–1.0) between the clip fingerprint
-    and the best-matching window in each reference track.
     """
     if not db_path.exists():
         return []
-
-    index: Dict[str, List[int]] = json.loads(db_path.read_text())
+    index = preload_index(db_path)
     if not index:
         return []
-
     _, query_fp = _fpcalc(clip_wav_path)
     if not query_fp:
         return []
-
-    # fpcalc -raw outputs unsigned 32-bit integers — use uint32 to avoid
-    # overflow corruption on values above 2^31.
-    query_arr = np.array(query_fp, dtype=np.uint32)
-    matches: List[TrackMatch] = []
-
-    for track_name, ref_fp in index.items():
-        ref_arr = np.array(ref_fp, dtype=np.uint32)
-        similarity = _bit_similarity(query_arr, ref_arr)
-        if similarity >= min_similarity:
-            matches.append(TrackMatch(
-                track_name=track_name,
-                confidence=round(similarity, 4),
-                time_offset=0.0,  # Chromaprint doesn't give per-hash offsets
-            ))
-
-    matches.sort(key=lambda m: m.confidence, reverse=True)
-
-    # Require the top match to be meaningfully better than the second-best.
-    # With a small DB, both tracks will score moderately — the margin separates
-    # genuine matches from "best of a bad lot" false positives.
-    if len(matches) >= 2:
-        margin = matches[0].confidence - matches[1].confidence
-        if margin < 0.10:
-            return []
-
-    return matches
+    return query_clip_preloaded(query_fp, index, min_similarity)

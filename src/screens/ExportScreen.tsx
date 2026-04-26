@@ -199,7 +199,7 @@ export default function ExportScreen() {
               onClick={openFolder}
               className="text-xs text-muted hover:text-foreground transition-colors"
             >
-              Open in Finder →
+              Open Folder →
             </button>
           </div>
         )}

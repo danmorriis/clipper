@@ -6,11 +6,8 @@
 #   pyinstaller dj_clipper_api.spec
 #
 # Output: dist/dj_clipper_api/ (--onedir for fast startup)
-#
-# Uses collect_all() for packages with complex dynamic imports (librosa, scipy,
-# sklearn, numba) so PyInstaller finds everything without manual maintenance.
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all
 
 datas = []
 binaries = []
@@ -57,7 +54,6 @@ hiddenimports += [
     'httptools.parser',
     'anyio',
     'anyio._backends._asyncio',
-    # numpy internals missed on some platforms
     'numpy.core._methods',
     'numpy.lib.format',
     'numpy.random',
@@ -72,15 +68,17 @@ a = Analysis(
     pathex=['.'],
     binaries=binaries,
     datas=datas + [
-        # Bundle the entire dj_clipper package (core, models, workers)
-        ('dj_clipper', 'dj_clipper'),
+        # Bundle only the active dj_clipper packages (core + models)
+        ('dj_clipper/core', 'dj_clipper/core'),
+        ('dj_clipper/models', 'dj_clipper/models'),
+        ('dj_clipper/config.py', 'dj_clipper'),
+        ('dj_clipper/__init__.py', 'dj_clipper'),
     ],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Exclude heavy packages we definitely don't use
         'PyQt6', 'PyQt5', 'tkinter', 'matplotlib', 'IPython',
         'jupyter', 'notebook', 'pytest',
     ],
@@ -98,7 +96,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # keep True for troubleshooting; set False once stable
+    console=False,
 )
 
 coll = COLLECT(
