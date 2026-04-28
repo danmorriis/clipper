@@ -12,11 +12,6 @@
     "download-bins:mac": "bash scripts/download-binaries.sh",
     "download-bins:win": "powershell -ExecutionPolicy Bypass -File scripts/download-binaries.ps1",
 
-    "dist": "bash scripts/build.sh",
-    "dist:mac": "bash scripts/build.sh --mac",
-    "dist:win": "bash scripts/build.sh --win",
-    "dist:skip-python": "bash scripts/build.sh --skip-python",
-
     "build:all": "python3 scripts/build_all.py"
   },
   "dependencies": {
