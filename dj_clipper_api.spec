@@ -13,52 +13,28 @@ datas = []
 binaries = []
 hiddenimports = []
 
-# Packages whose full import trees must be discovered at build time
-for pkg in ['librosa', 'sklearn', 'scipy', 'soundfile', 'resampy', 'numba', 'llvmlite', 'audioread']:
+# Packages whose full import trees must be discovered at build time.
+# collect_all() handles submodules, data files, and binaries together —
+# much more reliable than hiddenimports alone for complex packages.
+for pkg in [
+    # Audio processing
+    'librosa', 'sklearn', 'scipy', 'soundfile', 'resampy',
+    'numba', 'llvmlite', 'audioread',
+    # API server — these use lazy importlib loading that static analysis misses
+    'uvicorn', 'fastapi', 'starlette', 'pydantic',
+    'aiofiles', 'sse_starlette', 'anyio', 'h11', 'httptools',
+]:
     d, b, h = collect_all(pkg)
     datas    += d
     binaries += b
     hiddenimports += h
 
-# Uvicorn + FastAPI — explicitly list the lazy-loaded modules uvicorn discovers
-# at startup via importlib; PyInstaller misses these with static analysis.
+# Extra numpy internals that static analysis sometimes misses
 hiddenimports += [
-    'uvicorn',
-    'uvicorn.logging',
-    'uvicorn.loops',
-    'uvicorn.loops.asyncio',
-    'uvicorn.protocols',
-    'uvicorn.protocols.http',
-    'uvicorn.protocols.http.h11_impl',
-    'uvicorn.protocols.websockets',
-    'uvicorn.protocols.websockets.auto',
-    'uvicorn.lifespan',
-    'uvicorn.lifespan.on',
-    'starlette',
-    'starlette.routing',
-    'starlette.middleware',
-    'starlette.middleware.cors',
-    'starlette.responses',
-    'starlette.background',
-    'sse_starlette',
-    'sse_starlette.sse',
-    'fastapi',
-    'pydantic',
-    'pydantic.v1',
-    'aiofiles',
-    'aiofiles.os',
-    'aiofiles.threadpool',
-    'email_validator',
-    'h11',
-    'httptools',
-    'httptools.parser',
-    'anyio',
-    'anyio._backends._asyncio',
     'numpy.core._methods',
     'numpy.lib.format',
     'numpy.random',
     'numpy.random._common',
-    'numpy.random.common',
     'numpy.random.bounded_integers',
     'numpy.random.entropy',
 ]
@@ -96,7 +72,10 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    # console=True so stderr/stdout are piped correctly when spawned as a
+    # background child process on Windows. No visible console appears because
+    # Electron spawns it with stdio:'pipe', not attached to a terminal.
+    console=True,
 )
 
 coll = COLLECT(

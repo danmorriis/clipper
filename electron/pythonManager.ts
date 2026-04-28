@@ -101,11 +101,14 @@ export async function startPython(): Promise<number> {
 
   pythonProcess = spawn(cmd, args, { env, cwd, stdio: 'pipe' })
 
-  // Accumulate stderr so we can include it in the timeout error message
+  // Accumulate output so we can include it in the timeout error message
   let stderrBuf = ''
+  let exitCode: number | null = null
 
   pythonProcess.stdout?.on('data', (d: Buffer) => {
-    console.log('[python]', d.toString().trimEnd())
+    const text = d.toString().trimEnd()
+    stderrBuf += text + '\n'   // capture stdout too — uvicorn logs go here
+    console.log('[python]', text)
   })
   pythonProcess.stderr?.on('data', (d: Buffer) => {
     const text = d.toString().trimEnd()
@@ -113,9 +116,11 @@ export async function startPython(): Promise<number> {
     console.error('[python]', text)
   })
   pythonProcess.on('error', (err) => {
+    stderrBuf += `spawn error: ${err.message}\n`
     console.error('[python] spawn error:', err.message)
   })
   pythonProcess.on('close', (code) => {
+    exitCode = code
     if (code !== null && code !== 0) {
       console.error(`[python] exited with code ${code}`)
     }
@@ -125,8 +130,10 @@ export async function startPython(): Promise<number> {
     await waitForReady(port)
   } catch {
     throw new Error(
-      `Python API did not start in time (port ${port})\n` +
-      (stderrBuf ? `stderr:\n${stderrBuf}` : '(no stderr output)')
+      `Python API did not start in time (port ${port})` +
+      (exitCode !== null ? ` — exited with code ${exitCode}` : ' — process still running') +
+      '\n\n' +
+      (stderrBuf.trim() ? stderrBuf.trim() : '(no output captured — may be blocked by antivirus)')
     )
   }
   return port
