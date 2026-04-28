@@ -13,28 +13,26 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Out = Join-Path $RepoRoot "resources\bin\win"
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 
-# ── ffmpeg + ffprobe (BtbN/FFmpeg-Builds — official GPL static Windows builds) ─
-# Using the latest GPL build with all codecs included.
+# ffmpeg + ffprobe (BtbN/FFmpeg-Builds - official GPL static Windows builds)
 $FfmpegRepo  = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
 $FfmpegZip   = "ffmpeg-master-latest-win64-gpl.zip"
 $FfmpegUrl   = "$FfmpegRepo/$FfmpegZip"
 
-Write-Host "→ Downloading ffmpeg + ffprobe..."
+Write-Host "-> Downloading ffmpeg + ffprobe..."
 Invoke-WebRequest -Uri $FfmpegUrl -OutFile "$env:TEMP\$FfmpegZip" -UseBasicParsing
 Expand-Archive -Path "$env:TEMP\$FfmpegZip" -DestinationPath "$env:TEMP\ffmpeg_extracted" -Force
 
-# The zip has a single top-level folder; find the bin directory inside it
 $FfmpegBin = Get-ChildItem "$env:TEMP\ffmpeg_extracted" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1 -ExpandProperty DirectoryName
 Copy-Item (Join-Path $FfmpegBin "ffmpeg.exe")  (Join-Path $Out "ffmpeg.exe")
 Copy-Item (Join-Path $FfmpegBin "ffprobe.exe") (Join-Path $Out "ffprobe.exe")
 Remove-Item -Recurse -Force "$env:TEMP\$FfmpegZip", "$env:TEMP\ffmpeg_extracted"
 
-# ── fpcalc (Chromaprint — from official acoustid.org GitHub releases) ─────────
+# fpcalc (Chromaprint - from official acoustid.org GitHub releases)
 $ChromaVersion = "1.5.1"
 $ChromaFile    = "chromaprint-fpcalc-$ChromaVersion-windows-x86_64.zip"
 $ChromaUrl     = "https://github.com/acoustid/chromaprint/releases/download/v$ChromaVersion/$ChromaFile"
 
-Write-Host "→ Downloading fpcalc (chromaprint $ChromaVersion)..."
+Write-Host "-> Downloading fpcalc (chromaprint $ChromaVersion)..."
 Invoke-WebRequest -Uri $ChromaUrl -OutFile "$env:TEMP\$ChromaFile" -UseBasicParsing
 Expand-Archive -Path "$env:TEMP\$ChromaFile" -DestinationPath "$env:TEMP\fpcalc_extracted" -Force
 
@@ -42,9 +40,8 @@ $FpcalcExe = Get-ChildItem "$env:TEMP\fpcalc_extracted" -Recurse -Filter "fpcalc
 Copy-Item $FpcalcExe (Join-Path $Out "fpcalc.exe")
 Remove-Item -Recurse -Force "$env:TEMP\$ChromaFile", "$env:TEMP\fpcalc_extracted"
 
-# ── Done ──────────────────────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "✓ Binaries ready in $Out"
+Write-Host "Done - Binaries ready in $Out"
 Get-ChildItem $Out | Format-Table Name, Length
 
 Write-Host ""
