@@ -15,7 +15,9 @@
     "dist": "bash scripts/build.sh",
     "dist:mac": "bash scripts/build.sh --mac",
     "dist:win": "bash scripts/build.sh --win",
-    "dist:skip-python": "bash scripts/build.sh --skip-python"
+    "dist:skip-python": "bash scripts/build.sh --skip-python",
+
+    "build:all": "python3 scripts/build_all.py"
   },
   "dependencies": {
     "react": "^18.2.0",
