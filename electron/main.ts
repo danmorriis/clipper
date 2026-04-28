@@ -39,7 +39,7 @@ app.whenReady().then(async () => {
     console.error('Failed to start Python API:', err)
     dialog.showErrorBox(
       'Startup Error',
-      `Could not start the DJ Clipper backend.\n\n${err instanceof Error ? err.message : String(err)}`
+      `Could not start the Clip Lab backend.\n\n${err instanceof Error ? err.message : String(err)}`
     )
     app.quit()
   }

@@ -1,6 +1,6 @@
-appId: com.djclipper.app
-productName: DJ Clipper
-copyright: Copyright © 2025 DJ Clipper
+appId: com.cliplab.app
+productName: Clip Lab
+copyright: Copyright © 2026 Biscuit Boy
 
 # ── Source files included in the Electron app ────────────────────────────────
 files:
