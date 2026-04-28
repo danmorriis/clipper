@@ -1,4 +1,4 @@
-import { ChildProcess, spawn } from 'child_process'
+import { ChildProcess, spawn, spawnSync } from 'child_process'
 import { randomUUID } from 'crypto'
 import { app } from 'electron'
 import * as fs from 'fs'
@@ -72,6 +72,7 @@ export async function startPython(): Promise<number> {
   let args: string[]
 
   if (isDev) {
+
     // Prefer the project .venv so deps are available without manual activation.
     // Falls back to system python if the venv doesn't exist.
     const projectRoot = path.join(__dirname, '..')
@@ -90,6 +91,13 @@ export async function startPython(): Promise<number> {
   const cwd = isDev ? path.join(__dirname, '..') : undefined
   console.log('[python] spawn:', cmd, args.join(' '))
   console.log('[python] cwd:', cwd)
+
+  // On macOS, Gatekeeper quarantines child executables inside unsigned bundles.
+  // Strip the quarantine xattr and ensure the binary is executable before spawning.
+  if (!isDev && process.platform === 'darwin') {
+    spawnSync('xattr', ['-d', 'com.apple.quarantine', cmd])
+    spawnSync('chmod', ['+x', cmd])
+  }
 
   pythonProcess = spawn(cmd, args, { env, cwd, stdio: 'pipe' })
 
