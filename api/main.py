@@ -59,3 +59,20 @@ app.include_router(persist.router)
 @app.get("/healthz")
 def health():
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import sys
+    import uvicorn
+
+    host = "127.0.0.1"
+    port = int(os.environ.get("DJ_CLIPPER_PORT", "9001"))
+
+    args = sys.argv[1:]
+    for i, arg in enumerate(args):
+        if arg == "--host" and i + 1 < len(args):
+            host = args[i + 1]
+        elif arg == "--port" and i + 1 < len(args):
+            port = int(args[i + 1])
+
+    uvicorn.run(app, host=host, port=port)

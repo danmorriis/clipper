@@ -4,8 +4,12 @@ copyright: Copyright © 2026 Biscuit Boy
 
 # ── Source files included in the Electron app ────────────────────────────────
 files:
-  - dist/**          # Vite React build
-  - electron/**      # compiled Electron TS (main.js, preload.js, pythonManager.js)
+  - dist/index.html       # Vite React build
+  - dist/assets/**        # Vite assets
+  - electron/main.js      # compiled Electron TS
+  - electron/preload.js
+  - electron/pythonManager.js
+  - package.json
 
 # ── Extra resources bundled inside the .app / installer ──────────────────────
 # These are NOT in the asar archive — they live in Contents/Resources/ (mac)
@@ -34,6 +38,9 @@ mac:
       to: dj_clipper_api
     - from: resources/bin/mac
       to: bin/mac
+
+directories:
+  output: release
 
 dmg:
   background: null

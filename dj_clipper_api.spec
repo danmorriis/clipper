@@ -57,6 +57,7 @@ a = Analysis(
     excludes=[
         'PyQt6', 'PyQt5', 'tkinter', 'matplotlib', 'IPython',
         'jupyter', 'notebook', 'pytest',
+        'PIL', 'Pillow', 'Cython', 'cython',
     ],
     noarchive=False,
 )

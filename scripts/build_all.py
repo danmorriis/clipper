@@ -91,7 +91,9 @@ def check_prereqs():
     require("npm",   "Install Node.js 18+ from https://nodejs.org")
 
     # PyInstaller — install into current Python env if missing
-    if not shutil.which("pyinstaller"):
+    try:
+        import PyInstaller  # noqa: F401
+    except ImportError:
         warn("PyInstaller not found — installing…")
         run([sys.executable, "-m", "pip", "install", "pyinstaller"])
 
@@ -137,7 +139,7 @@ def build_python():
         if stale.exists():
             shutil.rmtree(stale)
 
-    run(["pyinstaller", str(REPO / "dj_clipper_api.spec"), "--noconfirm"])
+    run([sys.executable, "-m", "PyInstaller", str(REPO / "dj_clipper_api.spec"), "--noconfirm"])
 
     if not DIST_API.exists():
         error("PyInstaller finished but dist/dj_clipper_api/ was not produced.")
