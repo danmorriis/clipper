@@ -10,13 +10,18 @@
   box-sizing: border-box;
 }
 
+input, button, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
   background: #c5bfb8;
   color: #1e1a18;
-  font-family: 'Inter', -apple-system, 'Helvetica Neue', sans-serif;
+  font-family: 'Inter Variable', 'Inter', -apple-system, 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -188,5 +188,5 @@ def _write_tracklist(output_dir: Path, results) -> List[str]:
             lines.append(f"{filename} @ {ts}: unidentified")
 
     tl_path = output_dir / "tracklist.txt"
-    tl_path.write_text("\n".join(lines))
+    tl_path.write_text("\n".join(lines), encoding='utf-8')
     return lines

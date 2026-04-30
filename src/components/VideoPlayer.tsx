@@ -313,15 +313,26 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
       <div className="flex items-center gap-2">
         <button
           onClick={togglePlay}
-          className="w-8 h-8 flex items-center justify-center rounded bg-surface-high hover:bg-border text-foreground text-sm"
+          className="w-8 h-8 flex items-center justify-center rounded bg-surface-high hover:bg-border text-foreground"
         >
-          {playing ? '⏸' : '▶'}
+          {playing ? (
+            <svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor">
+              <rect x="0" y="0" width="3.5" height="13" rx="1"/>
+              <rect x="7.5" y="0" width="3.5" height="13" rx="1"/>
+            </svg>
+          ) : (
+            <svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor">
+              <path d="M1 0.5L10.5 6.5L1 12.5V0.5Z"/>
+            </svg>
+          )}
         </button>
         <button
           onClick={stop}
-          className="w-8 h-8 flex items-center justify-center rounded bg-surface-high hover:bg-border text-foreground text-sm"
+          className="w-8 h-8 flex items-center justify-center rounded bg-surface-high hover:bg-border text-foreground"
         >
-          ⏹
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor">
+            <rect x="0" y="0" width="11" height="11" rx="1.5"/>
+          </svg>
         </button>
         <span className="text-xs text-muted font-mono ml-1">
           {addClipMode

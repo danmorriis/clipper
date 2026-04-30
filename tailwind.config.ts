@@ -21,7 +21,7 @@ export default {
         border: '#9a9490',
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'Helvetica Neue', 'sans-serif'],
+        sans: ['Inter Variable', 'Inter', '-apple-system', 'Helvetica Neue', 'sans-serif'],
         mono: ['SF Mono', 'Monaco', 'Menlo', 'monospace'],
       },
       keyframes: {
