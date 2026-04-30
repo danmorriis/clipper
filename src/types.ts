@@ -43,6 +43,7 @@ export interface AnalysisParams {
   clipAll: boolean
   manualTimestamps: number[]
   outputDir?: string
+  b2b: boolean
 }
 
 // SSE progress event

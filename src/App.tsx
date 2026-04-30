@@ -18,7 +18,9 @@ declare global {
       openFolderDialog(): Promise<string | null>
       openFolder(path: string): void
       openUrl(url: string): void
-      submitFeedback(text: string): Promise<void>
+      submitFeedback(text: string, machine: string): Promise<void>
+      minimizeWindow(): void
+      closeWindow(): void
       getApiBase(): Promise<string>
       getToken(): Promise<string>
       platform(): string

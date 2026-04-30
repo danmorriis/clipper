@@ -13,8 +13,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openUrl: (url: string): void =>
     ipcRenderer.send('shell:openUrl', url),
 
-  submitFeedback: (text: string): Promise<void> =>
-    ipcRenderer.invoke('clipper:submitFeedback', text),
+  submitFeedback: (text: string, machine: string): Promise<void> =>
+    ipcRenderer.invoke('clipper:submitFeedback', text, machine),
 
   getApiBase: (): Promise<string> =>
     ipcRenderer.invoke('api:getBase'),
@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('api:getToken'),
 
   platform: (): string => process.platform,
+
+  minimizeWindow: (): void => ipcRenderer.send('window:minimize'),
+  closeWindow:    (): void => ipcRenderer.send('window:close'),
 
   getLicenseStatus: (): Promise<import('./license').LicenseStatus> =>
     ipcRenderer.invoke('license:getStatus'),

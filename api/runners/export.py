@@ -14,7 +14,9 @@ from typing import List, Tuple
 from dj_clipper.core.clip_exporter import export_clip
 from dj_clipper.core.fingerprint_db import build_index
 from dj_clipper.core.playlist_resolver import resolve_playlist
-from dj_clipper.core.track_matcher import identify_tracks
+from dj_clipper.core.track_matcher import identify_tracks, MIN_CONFIDENCE
+
+MIN_CONFIDENCE_B2B = 0.80  # higher threshold for B2B — forces uncertain matches to "unknown" rather than wrong IDs
 from dj_clipper.core.track_utils import clean_track_name
 from dj_clipper.models.clip_model import ClipCandidate, TrackMatch
 from dj_clipper.models.session_model import SessionState
@@ -141,12 +143,14 @@ def _identify_pass(session, results, output_dir, start_pct, cancel_event, q):
         _emit(q, pct, f"Identifying tracks for clip {i + 1}…")
         clip_path = clip_files[i] if i < len(clip_files) else None
         if clip_path and clip_path.exists():
+            conf_threshold = MIN_CONFIDENCE_B2B if (session.settings and session.settings.b2b) else MIN_CONFIDENCE
             matches = identify_tracks(
                 clip_path=clip_path,
                 db_path=session.db_path,
                 session_wav=session.wav_path,
                 candidate=candidate,
                 video_duration=session.video_duration,
+                min_confidence=conf_threshold,
             )
             if matches:
                 candidate.matched_tracks = matches

@@ -11,12 +11,15 @@ function createWindow(port: number): void {
 
   const isMac = process.platform === 'darwin'
 
+  const isWin = process.platform === 'win32'
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 920,
     minWidth: 1024,
     minHeight: 840,
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    frame: !isWin,
     backgroundColor: '#c5bfb8',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -78,6 +81,9 @@ ipcMain.handle('api:getToken', () => getToken())
 ipcMain.handle('license:getStatus', () => getLicenseStatus())
 ipcMain.handle('license:activate',  (_event, key: string) => activateLicense(key))
 
+ipcMain.on('window:minimize', () => mainWindow?.minimize())
+ipcMain.on('window:close',    () => mainWindow?.close())
+
 ipcMain.handle('dialog:openFile', async (_event, options: Electron.OpenDialogOptions) => {
   const result = await dialog.showOpenDialog(mainWindow!, options)
   return result.filePaths
@@ -98,14 +104,16 @@ ipcMain.on('shell:openUrl', (_event, url: string) => {
   shell.openExternal(url)
 })
 
-ipcMain.handle('clipper:submitFeedback', async (_event, text: string) => {
-  const body = `entry.448791064=${encodeURIComponent(text)}`
+ipcMain.handle('clipper:submitFeedback', async (_event, text: string, machine: string) => {
+  const MACHINE_ENTRY_ID = 'entry.467936750'
+  const parts = [`entry.448791064=${encodeURIComponent(text)}`]
+  if (machine) parts.push(`${MACHINE_ENTRY_ID}=${encodeURIComponent(machine)}`)
   await net.fetch(
     'https://docs.google.com/forms/d/e/1FAIpQLSfYHYJWEJm5kC0tC1Gf4LsK4TWz1LGt9vIDQ7BI-xlqwU_GwA/formResponse',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
+      body: parts.join('&'),
     }
   )
 })

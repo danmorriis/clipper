@@ -40,6 +40,7 @@ export function createSession(base: string, params: AnalysisParams): Promise<Ses
       clip_all: params.clipAll,
       manual_timestamps: params.manualTimestamps,
       output_dir: params.outputDir ?? null,
+      b2b: params.b2b,
     }),
   })
 }

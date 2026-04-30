@@ -1,10 +1,11 @@
 /**
- * On macOS with hiddenInset title bar the window controls overlap the content,
- * so we reserve 32px at the top as a drag region. On Windows the native title
- * bar handles all of this, so we render nothing.
+ * Reserves space at the top of the window for the title bar area.
+ * - macOS: 32px drag region for hiddenInset window controls
+ * - Windows: 32px drag region for custom window controls (frameless mode)
+ * - Other: nothing
  */
 export default function TitleBarSpacer() {
-  const isMac = window.electronAPI?.platform() === 'darwin'
-  if (!isMac) return null
+  const platform = window.electronAPI?.platform()
+  if (platform !== 'darwin' && platform !== 'win32') return null
   return <div className="drag-region h-8 shrink-0" />
 }

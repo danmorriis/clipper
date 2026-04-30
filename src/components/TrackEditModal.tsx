@@ -44,17 +44,19 @@ function TrackCombobox({
         autoComplete="off"
         className="w-full bg-surface-high border border-border rounded px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-foreground"
       />
-      {open && trackNames.length > 0 && (
+      {open && (
         <div className="absolute z-50 top-full mt-0.5 left-0 right-0 bg-surface-raised border border-border rounded shadow-lg max-h-48 overflow-y-auto">
-          {trackNames.map((t) => (
+          {['Unknown', ...trackNames].map((t) => (
             <div
               key={t}
               onMouseDown={(e) => {
                 e.preventDefault()
-                onChange(t)
+                onChange(t === 'Unknown' ? 'Unknown' : t)
                 setOpen(false)
               }}
-              className={`px-2.5 py-1.5 text-xs cursor-pointer hover:bg-surface-high ${value === t ? 'text-foreground font-medium' : 'text-muted'}`}
+              className={`px-2.5 py-1.5 text-xs cursor-pointer hover:bg-surface-high ${
+                (t === 'Unknown' ? value === '' : value === t) ? 'text-foreground font-medium' : 'text-muted'
+              }`}
             >
               {t}
             </div>

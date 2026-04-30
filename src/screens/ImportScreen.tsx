@@ -18,6 +18,7 @@ import { useSSE } from '../hooks/useSSE'
 import { useSessionStore } from '../store/session'
 import type { ClipMode, ProgressEvent } from '../types'
 import FeedbackButton from '../components/FeedbackButton'
+import WindowControls from '../components/WindowControls'
 import FeedbackScreen from './FeedbackScreen'
 import DarkModeToggle from '../components/DarkModeToggle'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -43,6 +44,7 @@ export default function ImportScreen() {
   const [playlistPath, setPlaylistPath] = useState<string | null>(null)
   const [searchRoot, setSearchRootState] = useState('')
   const [clipDuration, setClipDuration] = useState(45)
+  const [b2b, setB2b] = useState(false)
   const [mode, setMode] = useState<ClipMode>('topn')
   const [nClips, setNClips] = useState(10)
   const [tsText, setTsText] = useState('')
@@ -57,8 +59,9 @@ export default function ImportScreen() {
   const [progressError, setProgressError] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
 
-  const isMac = window.electronAPI?.platform() === 'darwin'
-  const titleBarHeight = isMac ? 32 : 0
+  const platform = window.electronAPI?.platform()
+  const isMac = platform === 'darwin'
+  const titleBarHeight = (isMac || platform === 'win32') ? 32 : 0
   const { dark, toggle: toggleDark } = useDarkMode()
   const { licenseStatus, setShowModal } = useLicense()
 
@@ -84,8 +87,8 @@ export default function ImportScreen() {
     setVideoError('')
     try {
       const { duration_seconds } = await validateVideo(apiBase, path)
-      if (duration_seconds < 300) {
-        setVideoError('Video must be at least 5 minutes long')
+      if (duration_seconds < 60) {
+        setVideoError('Video must be at least 1 minute long')
       } else {
         setVideoDuration(duration_seconds)
       }
@@ -132,7 +135,7 @@ export default function ImportScreen() {
     if (folder) handleSearchRootChange(folder)
   }
 
-  const canCreate = videoPath && videoDuration >= 300 && !videoError && playlistPath && searchRoot && (mode !== 'timeslots' || (tsText.trim() && !tsError))
+  const canCreate = videoPath && videoDuration > 0 && !videoError && playlistPath && searchRoot && (mode !== 'timeslots' || (tsText.trim() && !tsError))
 
   const handleCreate = async () => {
     if (!canCreate) return
@@ -153,6 +156,7 @@ export default function ImportScreen() {
         nClips,
         clipAll: mode === 'all',
         manualTimestamps,
+        b2b,
       })
       setSession(session)
       setSessionId(session.session_id)
@@ -233,8 +237,9 @@ export default function ImportScreen() {
     >
       <TurntablePlatter analysing={analysing} percent={progress.percent} />
 
-      {/* macOS drag region */}
+      {/* Title bar / drag region */}
       <TitleBarSpacer />
+      <WindowControls />
 
       {/* Dark mode toggle — top right */}
       <div
@@ -318,12 +323,51 @@ export default function ImportScreen() {
             </div>
           </div>
 
-          {/* Mode */}
+          {/* Mode + Set Type */}
           <div className="flex flex-col items-center gap-3">
-            <label className="text-[11px] text-muted font-medium uppercase tracking-[0.1em]">
-              Mode
-            </label>
-            <ModeToggle value={mode} onChange={setMode} />
+            <div className="flex items-center justify-center gap-6 w-full">
+              <div className="flex flex-col items-center gap-3">
+                <label className="text-[11px] text-muted font-medium uppercase tracking-[0.1em]">
+                  Mode
+                </label>
+                <ModeToggle value={mode} onChange={setMode} />
+              </div>
+              <div className="flex flex-col items-center gap-3">
+                <label className="flex items-center gap-1 text-[11px] text-muted font-medium tracking-[0.1em]">
+                  SET TYPE
+
+                  <span className="relative group inline-flex">
+                    <span className="w-3.5 h-3.5 rounded-full border border-muted flex items-center justify-center cursor-default">
+                      <span className="text-[9px] text-muted leading-none">i</span>
+                    </span>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 px-2.5 py-2 rounded bg-foreground text-surface text-[9px] font-small leading-relaxed opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50">
+                      Solo — Will try to force match every ID against your tracklist. Best if your tracklist contains every ID played in the video.
+                      <br />
+                      <br />
+                      B2B — Stricter. Less false positives. More 'Unknown' IDs that your b2b buddy plays if they aren't in your tracklist.
+                    </span>
+                  </span>
+                </label>
+                <div className="flex items-center rounded-full bg-surface-high p-0.5">
+                  <button
+                    onClick={() => setB2b(false)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                      !b2b ? 'bg-foreground text-surface' : 'text-muted hover:text-foreground'
+                    }`}
+                  >
+                    Solo
+                  </button>
+                  <button
+                    onClick={() => setB2b(true)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                      b2b ? 'bg-foreground text-surface' : 'text-muted hover:text-foreground'
+                    }`}
+                  >
+                    B2B
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Fixed-height container — prevents drop zones from shifting between modes */}
             <div className="w-full flex flex-col items-center justify-center h-24">
@@ -420,7 +464,9 @@ export default function ImportScreen() {
                   <span className="text-[9px] text-muted leading-none">i</span>
                 </div>
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 px-2.5 py-2 rounded bg-foreground text-surface text-[10px] leading-relaxed opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50">
-                  Location of your music files for ID matching against the tracklist you provided.
+                  Location of your audio files for ID matching against the tracklist provided.
+                  <br /> Track IDing will fail if the audio files aren't there, even if they're in your tracklist.
+                  <br />
                   <br />
                   Select the top level folder on your USB or drive that contains all your music :-)
                 </div>

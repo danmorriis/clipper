@@ -22,6 +22,7 @@ def create_session(body: CreateSessionIn):
         n_clips=body.n_clips,
         clip_all=body.clip_all,
         manual_timestamps=body.manual_timestamps,
+        b2b=body.b2b,
     )
     if body.playlist_path:
         state.playlist_path = Path(body.playlist_path)

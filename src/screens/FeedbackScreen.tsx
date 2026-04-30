@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import TitleBarSpacer from '../components/TitleBarSpacer'
+import WindowControls from '../components/WindowControls'
 
 type Status = 'idle' | 'sending' | 'sent' | 'error'
 
@@ -13,21 +14,27 @@ export default function FeedbackScreen({ onBack }: Props) {
   const [formVisible, setFormVisible] = useState(true)
   const [sentVisible, setSentVisible] = useState(false)
 
-  const isMac = window.electronAPI?.platform() === 'darwin'
-  const titleBarHeight = isMac ? 32 : 0
+  const platform = window.electronAPI?.platform()
+  const isMac = platform === 'darwin'
+  const titleBarHeight = (isMac || platform === 'win32') ? 32 : 0
+  const [machine, setMachine] = useState('')
+
   const handleSubmit = async () => {
     if (!text.trim() || status === 'sending') return
     setStatus('sending')
     try {
       if (window.electronAPI?.submitFeedback) {
-        await window.electronAPI.submitFeedback(text.trim())
+        await window.electronAPI.submitFeedback(text.trim(), machine)
       } else {
+        const MACHINE_ENTRY_ID = 'entry.467936750'
+        const parts = [`entry.448791064=${encodeURIComponent(text.trim())}`]
+        if (machine) parts.push(`${MACHINE_ENTRY_ID}=${encodeURIComponent(machine)}`)
         await fetch(
           'https://docs.google.com/forms/d/e/1FAIpQLSfYHYJWEJm5kC0tC1Gf4LsK4TWz1LGt9vIDQ7BI-xlqwU_GwA/formResponse',
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `entry.448791064=${encodeURIComponent(text.trim())}`,
+            body: parts.join('&'),
             mode: 'no-cors',
           }
         )
@@ -85,6 +92,33 @@ export default function FeedbackScreen({ onBack }: Props) {
             className="w-full bg-surface-high border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted outline-none focus:border-foreground transition-colors resize-none font-light leading-relaxed"
           />
 
+          {/* Machine toggle */}
+          <div className="flex flex-col items-center gap-2">
+            <label className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted">
+              Your Machine
+            </label>
+            <div className="flex items-center rounded-full bg-surface-high p-0.5">
+              {[
+                { value: 'Mac Silicon (M series macs)', label: 'Mac Silicon' },
+                { value: 'Mac Intel (pre 2021)', label: 'Mac Intel (pre 2021)' },
+                { value: 'Windows', label: 'Windows' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setMachine(value)}
+                  disabled={status === 'sending'}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                    machine === value
+                      ? 'bg-foreground text-surface'
+                      : 'text-muted hover:text-foreground'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {status === 'error' && (
             <p className="text-xs text-red-600 -mt-1">
               Something went wrong. Check your connection and try again.
@@ -93,7 +127,7 @@ export default function FeedbackScreen({ onBack }: Props) {
 
           <button
             onClick={handleSubmit}
-            disabled={!text.trim() || status === 'sending'}
+            disabled={!text.trim() || !machine || status === 'sending'}
             className="w-full py-3 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent/90 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
           >
             {status === 'sending' ? 'Sending…' : 'Send'}

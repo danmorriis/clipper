@@ -7,15 +7,15 @@
   "scripts": {
     "dev": "tsc -p tsconfig.node.json && concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build && tsc -p tsconfig.node.json",
-
     "build:python": "pyinstaller dj_clipper_api.spec",
-
     "download-bins:mac": "bash scripts/download-binaries.sh",
     "download-bins:win": "powershell -ExecutionPolicy Bypass -File scripts/download-binaries.ps1",
-
     "build:all": "python3 scripts/build_all.py"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource/inter": "^5.0.0",
+    "for": "^0.0.1-dev.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.3",

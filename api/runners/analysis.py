@@ -157,7 +157,9 @@ def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
         q.put({"cancelled": True, "done": True})
         return None
 
-    total_samples = int((session.video_duration - 20.0) / 20.0)
+    b2b = bool(session.settings and session.settings.b2b)
+    sample_step = 10.0 if b2b else 20.0
+    total_samples = int((session.video_duration - 20.0) / sample_step)
     _emit(q, 20, f"Scanning audio timeline (~{total_samples} samples)…")
 
     cancelled_flag = [False]
@@ -173,6 +175,8 @@ def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
         wav_path, db_path, session.video_duration,
         progress_callback=timeline_progress,
         cancel_event=cancel_event,
+        sample_step=sample_step,
+        min_confidence=0.80 if b2b else 0.65,
     )
 
     if cancelled_flag[0] or cancel_event.is_set():
@@ -202,6 +206,8 @@ def _run_fingerprint_mode(session, session_dir, wav_path, cancel_event, q):
         video_duration=session.video_duration,
         pcm=tl_result.pcm,
         sample_rate=tl_result.sample_rate,
+        sample_step=sample_step,
+        mix_exclusion=30.0 if b2b else 0.0,
     )
 
     if not candidates:

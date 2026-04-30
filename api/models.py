@@ -56,6 +56,7 @@ class CreateSessionIn(BaseModel):
     clip_all: bool = False
     manual_timestamps: List[float] = []
     output_dir: Optional[str] = None
+    b2b: bool = False
 
 
 class StartExportIn(BaseModel):

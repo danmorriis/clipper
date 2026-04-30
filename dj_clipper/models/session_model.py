@@ -12,6 +12,7 @@ class AnalysisSettings:
     n_clips: int               # 5–20
     clip_all: bool = False     # if True, surface all discovered transitions
     manual_timestamps: List[float] = field(default_factory=list)  # specific timeslot mode
+    b2b: bool = False          # B2B mode — raises track ID confidence threshold to reduce false positives
 
 
 @dataclass

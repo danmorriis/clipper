@@ -59,6 +59,7 @@ class TimelineResult(NamedTuple):
     timeline: List["_TimelineEntry"]
     pcm: np.ndarray
     sample_rate: int
+    sample_step: float
 
 
 # ── Internal data types ───────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ def _fingerprint_sample_pcm(
     sample_rate: int,
     index: Dict[str, np.ndarray],
     start: float,
+    min_confidence: float = MIN_CONFIDENCE,
 ) -> _TimelineEntry:
     """
     Slice a pre-decoded PCM array, fingerprint via libchromaprint (no subprocess),
@@ -113,7 +115,7 @@ def _fingerprint_sample_pcm(
 
     fp_ints = fingerprint_pcm(chunk, sample_rate)
     if fp_ints:
-        matches = query_clip_preloaded(fp_ints, index, MIN_CONFIDENCE)
+        matches = query_clip_preloaded(fp_ints, index, min_confidence)
         if matches:
             return _TimelineEntry(start=start, track=matches[0].track_name, confidence=matches[0].confidence)
     return _TimelineEntry(start=start, track=None, confidence=0.0)
@@ -125,7 +127,9 @@ def build_track_timeline(
     video_duration: float,
     progress_callback: Optional[Callable[[int, int, float], None]] = None,
     cancel_event: Optional[threading.Event] = None,
-) -> List[_TimelineEntry]:
+    sample_step: float = SAMPLE_STEP,
+    min_confidence: float = MIN_CONFIDENCE,
+) -> TimelineResult:
     """
     Sample session_wav at SAMPLE_STEP intervals, fingerprint each sample
     in parallel, and return a timeline of track identifications sorted
@@ -148,7 +152,7 @@ def build_track_timeline(
     t = 0.0
     while t + SAMPLE_DURATION <= video_duration:
         sample_starts.append(t)
-        t += SAMPLE_STEP
+        t += sample_step
 
     total = len(sample_starts)
     if total == 0:
@@ -174,7 +178,7 @@ def build_track_timeline(
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_start = {
-            executor.submit(_fingerprint_sample_pcm, pcm, sample_rate, index, start): start
+            executor.submit(_fingerprint_sample_pcm, pcm, sample_rate, index, start, min_confidence): start
             for start in sample_starts
         }
 
@@ -201,7 +205,7 @@ def build_track_timeline(
 
     # Reconstruct in chronological order (futures complete out of order)
     timeline = [results[s] for s in sample_starts if s in results]
-    return TimelineResult(timeline=timeline, pcm=pcm, sample_rate=sample_rate)
+    return TimelineResult(timeline=timeline, pcm=pcm, sample_rate=sample_rate, sample_step=sample_step)
 
 
 def _smooth_sandwiched_runs(runs: List[_TrackRun]) -> List[_TrackRun]:
@@ -249,19 +253,25 @@ def confirm_track_near(
     side: str,
     window: float = 120.0,
     bound: Optional[float] = None,
+    sample_step: float = SAMPLE_STEP,
+    mix_exclusion: float = 0.0,
 ) -> Tuple[Optional[str], float]:
     """
     Find the most reliable track ID on one side of a transition midpoint.
 
-    Scans identified timeline samples within `window` seconds of `midpoint`
-    on the given side ('pre' = backwards, 'post' = forwards), optionally
-    clamped to `bound`.  Prefers the first adjacent pair (gap ≤ SAMPLE_STEP+1s)
-    that agree on the same track; falls back to the single highest-confidence
-    sample.  Returns (track_name, confidence) or (None, 0.0).
+    Primary strategy: majority vote across all identified samples in the run,
+    excluding those within mix_exclusion seconds of the midpoint (mix zone).
+    This avoids being misled by the closest samples, which are most likely to
+    contain bleed from the other track during the crossfade.
+
+    Fallback (when all samples are within the mix zone): closest adjacent
+    agreeing pair, then highest-confidence single sample.
 
     bound: for 'pre', earliest allowed sample time (e.g. run start);
            for 'post', latest allowed sample time (e.g. run end).
     """
+    from collections import Counter
+
     if side == 'pre':
         lo = max(bound, midpoint - window) if bound is not None else midpoint - window
         candidates = [
@@ -280,14 +290,25 @@ def confirm_track_near(
     if not candidates:
         return None, 0.0
 
-    # Prefer the first adjacent pair agreeing on the same track
+    # B2B only: majority vote over samples outside the mix zone.
+    # mix_exclusion=0.0 means solo mode — skip this entirely.
+    if mix_exclusion > 0.0:
+        clean = [e for e in candidates if abs(e.start - midpoint) > mix_exclusion]
+        if clean:
+            counts = Counter(e.track for e in clean)
+            best_track = counts.most_common(1)[0][0]
+            best_confs = [e.confidence for e in clean if e.track == best_track]
+            return best_track, sum(best_confs) / len(best_confs)
+
+    # Solo mode (and B2B fallback when all samples are in the mix zone):
+    # prefer the first adjacent agreeing pair closest to midpoint
     for i in range(len(candidates) - 1):
         a_e = candidates[i]
         b_e = candidates[i + 1]
-        if abs(a_e.start - b_e.start) <= SAMPLE_STEP + 1.0 and a_e.track == b_e.track:
+        if abs(a_e.start - b_e.start) <= sample_step + 1.0 and a_e.track == b_e.track:
             return a_e.track, (a_e.confidence + b_e.confidence) / 2.0
 
-    # Fallback: highest-confidence single identified sample
+    # Last resort: highest-confidence single sample
     best = max(candidates, key=lambda e: e.confidence)
     return best.track, best.confidence
 
@@ -298,6 +319,8 @@ def find_transitions(
     video_duration: float,
     pcm: Optional[np.ndarray] = None,
     sample_rate: Optional[int] = None,
+    sample_step: float = SAMPLE_STEP,
+    mix_exclusion: float = 0.0,
 ) -> List[ClipCandidate]:
     """
     Return one ClipCandidate per detected A→B track boundary, sorted by
@@ -337,7 +360,7 @@ def find_transitions(
     # directly as A→B rather than producing a spurious Unknown label.  When
     # discarded, the neighbouring A and B runs become adjacent and their midpoint
     # correctly spans the crossfade zone.
-    _min_unknown = max(1, int(_MIN_UNKNOWN_SECONDS / SAMPLE_STEP))
+    _min_unknown = max(1, int(_MIN_UNKNOWN_SECONDS / sample_step))
     confirmed = [
         r for r in runs
         if r.n_samples >= (_min_unknown if r.track == _UNKNOWN else MIN_SOLO_SAMPLES)
@@ -363,8 +386,8 @@ def find_transitions(
             continue
         mid = (a.last_time + b.first_time) / 2.0
 
-        pre_track, pre_conf = confirm_track_near(timeline, mid, 'pre', bound=a.first_time)
-        post_track, post_conf = confirm_track_near(timeline, mid, 'post', bound=b.last_time)
+        pre_track, pre_conf = confirm_track_near(timeline, mid, 'pre', bound=a.first_time, sample_step=sample_step, mix_exclusion=mix_exclusion)
+        post_track, post_conf = confirm_track_near(timeline, mid, 'post', bound=b.last_time, sample_step=sample_step, mix_exclusion=mix_exclusion)
         if pre_track is None:
             pre_track, pre_conf = a.track, a.avg_confidence
         if post_track is None:
