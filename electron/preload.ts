@@ -23,4 +23,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('api:getToken'),
 
   platform: (): string => process.platform,
+
+  getLicenseStatus: (): Promise<import('./license').LicenseStatus> =>
+    ipcRenderer.invoke('license:getStatus'),
+
+  activateLicense: (key: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('license:activate', key),
 })

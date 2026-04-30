@@ -21,6 +21,7 @@ import FeedbackButton from '../components/FeedbackButton'
 import FeedbackScreen from './FeedbackScreen'
 import DarkModeToggle from '../components/DarkModeToggle'
 import { useDarkMode } from '../hooks/useDarkMode'
+import { useLicense } from '../contexts/LicenseContext'
 
 const DURATIONS = [30, 45, 60]
 const TS_RE = /^\d{1,2}:\d{2}(:\d{2})?$/
@@ -59,6 +60,7 @@ export default function ImportScreen() {
   const isMac = window.electronAPI?.platform() === 'darwin'
   const titleBarHeight = isMac ? 32 : 0
   const { dark, toggle: toggleDark } = useDarkMode()
+  const { licenseStatus, setShowModal } = useLicense()
 
   useEffect(() => {
     const id = setTimeout(() => setFadingIn(false), 50)
@@ -465,32 +467,48 @@ export default function ImportScreen() {
         </div>
       </div>
 
-      <span
+      <div
         style={{
-          position: 'absolute',
-          bottom: 16,
-          left: 20,
-          fontSize: 11,
-          fontWeight: 300,
+          position:      'absolute',
+          bottom:        16,
+          left:          20,
+          fontSize:      11,
+          fontWeight:    300,
           letterSpacing: '0.15em',
-          color: '#8a847e',
-          pointerEvents: 'none',
+          color:         '#8a847e',
+          display:       'flex',
+          alignItems:    'center',
+          gap:           6,
+          userSelect:    'none',
         }}
       >
-        {(() => {
-          const parts = [`v${__APP_VERSION__}`]
-          if (__BETA_EXPIRY__) {
-            const expiry = new Date(__BETA_EXPIRY__)
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            expiry.setHours(0, 0, 0, 0)
-            const days = Math.ceil((expiry.getTime() - today.getTime()) / 86_400_000)
-            if (days > 0) parts.push(`${days} DAY${days === 1 ? '' : 'S'} LEFT`)
-            else parts.push('EXPIRED')
-          }
-          return parts.join('  •  ')
-        })()}
-      </span>
+        <span>{`v${__APP_VERSION__}`}</span>
+        {licenseStatus.status !== 'loading' && (
+          <>
+            <span style={{ opacity: 0.5 }}>•</span>
+            {licenseStatus.status === 'trial' ? (
+              <button
+                onClick={() => setShowModal(true)}
+                style={{
+                  background:    'none',
+                  border:        'none',
+                  padding:       0,
+                  font:          'inherit',
+                  letterSpacing: 'inherit',
+                  color:         'inherit',
+                  cursor:        'pointer',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#5a5450')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '')}
+              >
+                {`${licenseStatus.daysLeft} DAY${licenseStatus.daysLeft === 1 ? '' : 'S'} LEFT  •  TRIAL`}
+              </button>
+            ) : licenseStatus.status === 'licensed' ? (
+              <span>{licenseStatus.tag ?? 'LICENSED'}</span>
+            ) : null}
+          </>
+        )}
+      </div>
 
       <FeedbackButton onClick={() => navigateTo('feedback')} />
     </div>

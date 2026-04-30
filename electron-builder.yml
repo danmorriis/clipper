@@ -9,6 +9,7 @@ files:
   - electron/main.js      # compiled Electron TS
   - electron/preload.js
   - electron/pythonManager.js
+  - electron/license.js
   - package.json
 
 # ── Extra resources bundled inside the .app / installer ──────────────────────
