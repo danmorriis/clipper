@@ -94,9 +94,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   addCandidates: (newOnes) =>
     set((state) => {
-      const merged = [...state.candidates, ...newOnes]
+      const existingRanks = new Set(state.candidates.map((c) => c.rank))
+      const fresh = newOnes.filter((c) => !existingRanks.has(c.rank))
+      const merged = [...state.candidates, ...fresh]
       merged.sort((a, b) => a.start_time - b.start_time)
-      merged.forEach((c, i) => { c.rank = i + 1 })
       return { candidates: merged }
     }),
 

@@ -84,9 +84,6 @@ def add_manual_clip(session_id: str, body: AddManualClipIn):
     )
     candidates.append(new_clip)
     candidates.sort(key=lambda c: c.start_time)
-    # Re-rank after sort
-    for i, c in enumerate(candidates, 1):
-        c.rank = i
 
     _generate_thumbnails(entry.state, [new_clip])
 
@@ -118,10 +115,12 @@ def generate_more(session_id: str, count: int = 5):
             added.append(candidate)
 
     entry.next_all_idx = idx
+    # Assign fresh sequential ranks to the new clips only — existing ranks are frozen
+    next_rank = max((c.rank for c in state.candidates), default=0) + 1
+    for i, candidate in enumerate(added):
+        candidate.rank = next_rank + i
     state.candidates.extend(added)
     state.candidates.sort(key=lambda c: c.start_time)
-    for i, c in enumerate(state.candidates, 1):
-        c.rank = i
 
     if added:
         _generate_thumbnails(entry.state, added)

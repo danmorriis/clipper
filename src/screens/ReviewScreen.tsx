@@ -86,9 +86,11 @@ export default function ReviewScreen() {
   const handleGenerateMore = async () => {
     if (!sessionId) return
     try {
+      const existingRanks = new Set(candidates.map((c) => c.rank))
       const { candidates: more, next_all_idx } = await generateMore(apiBase, sessionId, 5)
       addCandidates(more)
-      markNewRanks(more.map((c) => c.rank))
+      // Only notify for clips that weren't already in the store
+      markNewRanks(more.filter((c) => !existingRanks.has(c.rank)).map((c) => c.rank))
       setNextAllIdx(next_all_idx)
     } catch {}
   }

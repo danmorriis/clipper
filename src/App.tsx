@@ -13,6 +13,8 @@ declare global {
       openFileDialog(options: object): Promise<string[]>
       openFolderDialog(): Promise<string | null>
       openFolder(path: string): void
+      openUrl(url: string): void
+      submitFeedback(text: string): Promise<void>
       getApiBase(): Promise<string>
       getToken(): Promise<string>
       platform(): string

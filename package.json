@@ -1,6 +1,6 @@
 {
   "name": "clip-lab",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Clip Lab — extract social clips from DJ sets",
   "author": "Biscuit Boy",
   "main": "electron/main.js",

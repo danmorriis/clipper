@@ -38,16 +38,41 @@ html, body, #root {
   background: #636060;
 }
 
-/* Turntable platter rotation */
-@keyframes platter-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+
+/* ── Dark mode ────────────────────────────────────────────────────────────────
+   Invert the entire UI via CSS filter. Orange/accent elements are counter-
+   inverted so they double-invert back to their original colour.               */
+#root {
+  transition: filter 0.35s ease;
+}
+#root.dark {
+  filter: invert(1);
 }
 
-@keyframes platter-spin-reverse {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(-360deg); }
+/* Counter-invert orange elements so they stay orange in dark mode */
+#root.dark .preserve-orange {
+  filter: invert(1);
 }
+#root.dark [class*="bg-accent"],
+#root.dark [class*="text-accent"] {
+  filter: invert(1);
+}
+
+/* Counter-invert elements that should NOT be affected by dark mode
+   (clip thumbnails, video player) */
+#root.dark .no-invert {
+  filter: invert(1);
+}
+
+/* Range slider thumb — can't be counter-inverted via filter on pseudoelement,
+   so we pre-compensate the colour (#d94e00 inverted = #26b1ff) */
+#root.dark input[type="range"]::-webkit-slider-thumb {
+  background: #26b1ff;
+}
+#root.dark input[type="range"]::-moz-range-thumb {
+  background: #26b1ff;
+}
+/* ────────────────────────────────────────────────────────────────────────── */
 
 /* Electron drag region */
 .drag-region {

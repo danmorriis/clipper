@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, shell } from 'electron'
 import * as path from 'path'
 import { getToken, startPython, stopPython } from './pythonManager'
 
@@ -37,10 +37,19 @@ app.whenReady().then(async () => {
     createWindow(port)
   } catch (err) {
     console.error('Failed to start Python API:', err)
-    dialog.showErrorBox(
-      'Startup Error',
-      `Could not start the Clip Lab backend.\n\n${err instanceof Error ? err.message : String(err)}`
-    )
+    if (err instanceof Error && err.message === 'BETA_EXPIRED') {
+      dialog.showMessageBoxSync({
+        type: 'info',
+        title: 'Clip Lab Beta',
+        message: 'Thank you so much for testing — the trial is now over! :-)',
+        buttons: ['OK'],
+      })
+    } else {
+      dialog.showErrorBox(
+        'Startup Error',
+        `Could not start the Clip Lab backend.\n\n${err instanceof Error ? err.message : String(err)}`
+      )
+    }
     app.quit()
   }
 })
@@ -79,4 +88,20 @@ ipcMain.handle('dialog:openFolder', async () => {
 
 ipcMain.on('shell:openFolder', (_event, folderPath: string) => {
   shell.openPath(folderPath)
+})
+
+ipcMain.on('shell:openUrl', (_event, url: string) => {
+  shell.openExternal(url)
+})
+
+ipcMain.handle('clipper:submitFeedback', async (_event, text: string) => {
+  const body = `entry.448791064=${encodeURIComponent(text)}`
+  await net.fetch(
+    'https://docs.google.com/forms/d/e/1FAIpQLSfYHYJWEJm5kC0tC1Gf4LsK4TWz1LGt9vIDQ7BI-xlqwU_GwA/formResponse',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    }
+  )
 })

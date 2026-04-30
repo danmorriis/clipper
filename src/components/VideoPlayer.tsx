@@ -58,6 +58,7 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
 
   const clipStartRef = useRef(0)
   const clipEndRef = useRef(60)
+  const seekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Initialise trim state when entering add-clip mode
   useEffect(() => {
@@ -69,6 +70,7 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
     pendingTrimRef.current = { start: 0, end: defaultClipDuration }
     setAddPreTrack(null)
     setAddPostTrack(null)
+    setEditMode(false)
     setUnlocked(false)
     maxClipRef.current = 60
     const video = videoRef.current
@@ -211,12 +213,14 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
     setTrimStart(start)
     setTrimEnd(end)
     pendingTrimRef.current = { start, end }
-    // Always park the needle at the clip start so elapsed time reads 0:00
-    const video = videoRef.current
-    if (video) {
-      video.currentTime = start
-      setCurrentTime(start)
-    }
+    setCurrentTime(start)
+    // Debounce the actual video seek — seeking on every mousemove is expensive,
+    // especially when the context window spans the full video in add-clip mode.
+    if (seekTimerRef.current !== null) clearTimeout(seekTimerRef.current)
+    seekTimerRef.current = setTimeout(() => {
+      seekTimerRef.current = null
+      if (videoRef.current) videoRef.current.currentTime = start
+    }, 120)
   }
 
   const handleApply = async () => {
@@ -295,8 +299,8 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
 
   return (
     <div className="flex flex-col gap-2 h-full">
-      {/* Video */}
-      <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
+      {/* Video — counter-invert so the picture stays correct in dark mode */}
+      <div className="no-invert relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
         <video
           ref={videoRef}
           src={src}
@@ -343,47 +347,24 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
 
       {/* Track labels + Edit Clip */}
       <div className="flex flex-col text-xs text-muted">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
             {addClipMode ? (
-              /* Live-detected tracks in add-clip mode — not editable */
-              <>
-                {pre && <span className="truncate">{pre}</span>}
-                {pre && post && <span className="text-[11px] leading-tight">↓</span>}
-                {post && <span className="truncate">{post}</span>}
-                {!pre && !post && <span className="italic">Drag handles to identify tracks…</span>}
-              </>
+              <span className="truncate block">
+                {pre && post
+                  ? `${pre} → ${post}`
+                  : pre || post || <span className="italic">Drag handles to identify tracks…</span>}
+              </span>
             ) : (
-              /* Normal mode — clickable to open track edit modal */
-              <>
-                {pre && (
-                  <button
-                    onClick={() => setShowTrackEdit(true)}
-                    className="truncate text-left hover:text-foreground transition-colors"
-                    title="Click to edit tracks"
-                  >
-                    {pre}
-                  </button>
-                )}
-                {pre && post && <span className="text-[11px] leading-tight">↓</span>}
-                {post && (
-                  <button
-                    onClick={() => setShowTrackEdit(true)}
-                    className="truncate text-left hover:text-foreground transition-colors"
-                    title="Click to edit tracks"
-                  >
-                    {post}
-                  </button>
-                )}
-                {!pre && !post && (
-                  <button
-                    onClick={() => setShowTrackEdit(true)}
-                    className="text-left hover:text-foreground transition-colors italic"
-                  >
-                    Unknown track — click to set
-                  </button>
-                )}
-              </>
+              <button
+                onClick={() => setShowTrackEdit(true)}
+                className="truncate block w-full text-left hover:text-foreground transition-colors"
+                title="Click to edit tracks"
+              >
+                {pre && post
+                  ? `${pre} → ${post}`
+                  : pre || post || <span className="italic">Unknown track — click to set</span>}
+              </button>
             )}
           </div>
           {!addClipMode && !editMode && candidate && !candidate.is_manual && (
@@ -399,7 +380,7 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
 
       {/* Trim bar — always in add-clip mode, only in edit mode otherwise */}
       {(addClipMode || editMode) && (
-        <>
+        <div className="no-invert flex flex-col gap-2">
           <TrimBar
             ctxStart={addClipMode ? ctxStartAdd : ctxStart}
             ctxEnd={addClipMode ? ctxEndAdd : ctxEnd}
@@ -477,7 +458,7 @@ export default function VideoPlayer({ candidate, addClipMode = false, defaultCli
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
       {showTrackEdit && candidate && (
         <TrackEditModal

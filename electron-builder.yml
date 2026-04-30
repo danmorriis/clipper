@@ -28,8 +28,11 @@ mac:
         - x64      # Intel Mac
   category: public.app-category.music
   icon: resources/icons/icon.icns
-  # Hardened runtime is required for Apple notarization
-  hardenedRuntime: true
+  # Ad-hoc signing — free, no Apple Developer account needed.
+  # Lets arm64 apps run on Apple Silicon without the "damaged" Gatekeeper error.
+  # Users still need to right-click → Open the first time (no notarization).
+  identity: '-'
+  hardenedRuntime: false
   gatekeeperAssess: false
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist

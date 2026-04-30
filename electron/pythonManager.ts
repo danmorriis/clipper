@@ -104,9 +104,11 @@ export async function startPython(): Promise<number> {
   // Accumulate output so we can include it in the timeout error message
   let stderrBuf = ''
   let exitCode: number | null = null
+  let betaExpired = false
 
   pythonProcess.stdout?.on('data', (d: Buffer) => {
     const text = d.toString().trimEnd()
+    if (text.includes('BETA_EXPIRED')) betaExpired = true
     stderrBuf += text + '\n'   // capture stdout too — uvicorn logs go here
     console.log('[python]', text)
   })
@@ -119,16 +121,27 @@ export async function startPython(): Promise<number> {
     stderrBuf += `spawn error: ${err.message}\n`
     console.error('[python] spawn error:', err.message)
   })
-  pythonProcess.on('close', (code) => {
-    exitCode = code
-    if (code !== null && code !== 0) {
-      console.error(`[python] exited with code ${code}`)
-    }
+
+  // Resolves/rejects as soon as the process exits (handles early clean exit)
+  const earlyExit = new Promise<never>((_, reject) => {
+    pythonProcess!.on('close', (code) => {
+      exitCode = code
+      if (code !== null && code !== 0) {
+        console.error(`[python] exited with code ${code}`)
+      }
+      if (betaExpired) {
+        reject(new Error('BETA_EXPIRED'))
+      } else if (code === 0) {
+        reject(new Error('Python process exited before the API was ready'))
+      }
+      // non-zero exit: let waitForReady time out with full stderr context
+    })
   })
 
   try {
-    await waitForReady(port)
-  } catch {
+    await Promise.race([waitForReady(port), earlyExit])
+  } catch (err) {
+    if (err instanceof Error && err.message === 'BETA_EXPIRED') throw err
     throw new Error(
       `Python API did not start in time (port ${port})` +
       (exitCode !== null ? ` — exited with code ${exitCode}` : ' — process still running') +

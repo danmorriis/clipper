@@ -82,7 +82,7 @@ export default function ClipCard({ candidate, selected, isNew = false, onSelect 
           ${candidate.kept ? 'bg-surface-raised' : 'bg-surface opacity-60'}
         `}
       >
-        <div className="relative w-full bg-surface-high" style={{ aspectRatio: '16/9' }}>
+        <div className="no-invert relative w-full bg-surface-high" style={{ aspectRatio: '16/9' }}>
           {thumbSrc && (
             <img
               key={imgKey}
@@ -103,7 +103,7 @@ export default function ClipCard({ candidate, selected, isNew = false, onSelect 
             </div>
           )}
           {isNew && (
-            <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full bg-accent" />
+            <div className="no-invert absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full bg-accent" />
           )}
         </div>
 
@@ -122,7 +122,7 @@ export default function ClipCard({ candidate, selected, isNew = false, onSelect 
         <button
           onClick={(e) => { e.stopPropagation(); toggleKept() }}
           className={`
-            w-full py-1 text-[10px] font-medium tracking-[0.08em] uppercase
+            no-invert w-full py-1 text-[10px] font-medium tracking-[0.08em] uppercase
             ${candidate.kept
               ? 'bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800'
               : 'bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700'

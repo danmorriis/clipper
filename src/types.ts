@@ -1,3 +1,6 @@
+declare const __APP_VERSION__: string
+declare const __BETA_EXPIRY__: string   // ISO date string, e.g. '2026-05-08'; empty string = no expiry
+
 export interface TrackMatch {
   track_name: string
   confidence: number

@@ -17,6 +17,10 @@ import TurntablePlatter from '../components/TurntablePlatter'
 import { useSSE } from '../hooks/useSSE'
 import { useSessionStore } from '../store/session'
 import type { ClipMode, ProgressEvent } from '../types'
+import FeedbackButton from '../components/FeedbackButton'
+import FeedbackScreen from './FeedbackScreen'
+import DarkModeToggle from '../components/DarkModeToggle'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 const DURATIONS = [30, 45, 60]
 const TS_RE = /^\d{1,2}:\d{2}(:\d{2})?$/
@@ -48,11 +52,13 @@ export default function ImportScreen() {
   const [analysing, setAnalysing] = useState(false)
   const [fadingOut, setFadingOut] = useState(false)
   const [fadingIn, setFadingIn] = useState(true)
+  const [page, setPage] = useState<'main' | 'feedback'>('main')
   const [progressError, setProgressError] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
 
   const isMac = window.electronAPI?.platform() === 'darwin'
   const titleBarHeight = isMac ? 32 : 0
+  const { dark, toggle: toggleDark } = useDarkMode()
 
   useEffect(() => {
     const id = setTimeout(() => setFadingIn(false), 50)
@@ -195,7 +201,28 @@ export default function ImportScreen() {
     setAnalysing(false)
   }
 
+  const navigateTo = (target: 'main' | 'feedback') => {
+    setFadingOut(true)
+    setTimeout(() => {
+      setPage(target)
+      setFadingOut(false)
+      setFadingIn(true)
+      setTimeout(() => setFadingIn(false), 50)
+    }, 700)
+  }
+
   const uiOpacity = { opacity: analysing ? 0 : 1, pointerEvents: analysing ? 'none' : 'auto' } as const
+
+  if (page === 'feedback') {
+    return (
+      <div
+        className="relative isolate h-full bg-surface overflow-hidden transition-opacity duration-700"
+        style={{ opacity: fadingOut || fadingIn ? 0 : 1 }}
+      >
+        <FeedbackScreen onBack={() => navigateTo('main')} />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -206,6 +233,14 @@ export default function ImportScreen() {
 
       {/* macOS drag region */}
       <TitleBarSpacer />
+
+      {/* Dark mode toggle — top right */}
+      <div
+        className="absolute"
+        style={{ top: titleBarHeight + 16, right: 20, zIndex: 20 }}
+      >
+        <DarkModeToggle dark={dark} onToggle={toggleDark} />
+      </div>
 
       {/* Progress message — centred over platter */}
       {analysing && (
@@ -430,6 +465,34 @@ export default function ImportScreen() {
         </div>
       </div>
 
+      <span
+        style={{
+          position: 'absolute',
+          bottom: 16,
+          left: 20,
+          fontSize: 11,
+          fontWeight: 300,
+          letterSpacing: '0.15em',
+          color: '#8a847e',
+          pointerEvents: 'none',
+        }}
+      >
+        {(() => {
+          const parts = [`v${__APP_VERSION__}`]
+          if (__BETA_EXPIRY__) {
+            const expiry = new Date(__BETA_EXPIRY__)
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            expiry.setHours(0, 0, 0, 0)
+            const days = Math.ceil((expiry.getTime() - today.getTime()) / 86_400_000)
+            if (days > 0) parts.push(`${days} DAY${days === 1 ? '' : 'S'} LEFT`)
+            else parts.push('EXPIRED')
+          }
+          return parts.join('  •  ')
+        })()}
+      </span>
+
+      <FeedbackButton onClick={() => navigateTo('feedback')} />
     </div>
   )
 }

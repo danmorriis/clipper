@@ -13,6 +13,7 @@ const HANDLE_W = 8
 const HIT_R = 20
 const MOVE_TAB_R = 14   // half-width of the centre drag tab (28 px total — always clickable)
 const MIN_CLIP = 15
+const PILL_Y = BAR_TOP + BAR_H + 5   // pill sits below the scrub bar with a small gap
 
 function fmtTs(t: number): string {
   const s = Math.floor(t)
@@ -81,6 +82,7 @@ export default function TrimBar({
   const onMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = svgRef.current!.getBoundingClientRect()
     const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
     const w = rect.width
     const sx = tToX(trimStart, w)
     const ex = tToX(trimEnd, w)
@@ -88,27 +90,32 @@ export default function TrimBar({
     const ds = Math.abs(x - sx)
     const de = Math.abs(x - ex)
 
-    // Centre drag tab is checked first — it is always a fixed 28 px wide so it
-    // remains clickable even when the clip region is only a few pixels wide.
-    if (Math.abs(x - midX) < MOVE_TAB_R) {
-      dragRef.current = {
-        type: 'bar',
-        originT: xToT(x, w),
-        originStart: trimStart,
-        originEnd: trimEnd,
-      }
-    } else if (ds < HIT_R && ds <= de) {
+    const inBar  = y >= BAR_TOP && y <= BAR_TOP + BAR_H
+    const inPill = y >= PILL_Y  && y <= PILL_Y + 14
+
+    if (inBar && ds < HIT_R && ds <= de) {
+      // Start handle — only within bar height
       dragRef.current = { type: 'start', originT: 0, originStart: 0, originEnd: 0 }
-    } else if (de < HIT_R) {
+    } else if (inBar && de < HIT_R) {
+      // End handle — only within bar height
       dragRef.current = { type: 'end', originT: 0, originStart: 0, originEnd: 0 }
-    } else if (x >= sx && x <= ex) {
+    } else if (inPill && Math.abs(x - midX) < MOVE_TAB_R) {
+      // Centre pill — only within pill bounds
       dragRef.current = {
         type: 'bar',
         originT: xToT(x, w),
         originStart: trimStart,
         originEnd: trimEnd,
       }
-    } else {
+    } else if (inBar && x >= sx && x <= ex) {
+      // Click inside clip region on the bar itself
+      dragRef.current = {
+        type: 'bar',
+        originT: xToT(x, w),
+        originStart: trimStart,
+        originEnd: trimEnd,
+      }
+    } else if (inBar) {
       onSeek(xToT(x, w))
     }
 
@@ -192,7 +199,7 @@ export default function TrimBar({
     <svg
       ref={svgRef}
       width="100%"
-      height="70"
+      height="90"
       onMouseDown={startGlobalDrag}
       style={{ cursor: 'pointer', userSelect: 'none' }}
     >
@@ -203,8 +210,8 @@ export default function TrimBar({
       </defs>
 
       {/* Context labels */}
-      <text x={0} y={11} fontSize={9} fill="#555555" textAnchor="start">{fmtTs(ctxStart)}</text>
-      <text x={w} y={11} fontSize={9} fill="#555555" textAnchor="end">{fmtTs(ctxEnd)}</text>
+      <text x={0} y={11} fontSize={9} fill="#888888" textAnchor="start">{fmtTs(ctxStart)}</text>
+      <text x={w} y={11} fontSize={9} fill="#888888" textAnchor="end">{fmtTs(ctxEnd)}</text>
 
       {/* Background track — dark fallback while thumbnails load */}
       <rect x={HANDLE_W} y={BAR_TOP} width={Math.max(0, w - 2 * HANDLE_W)} height={BAR_H} rx={4} fill="#1a1a1a" />
@@ -246,23 +253,23 @@ export default function TrimBar({
       {/* Border around clip region */}
       <rect x={sx} y={BAR_TOP} width={Math.max(0, ex - sx)} height={BAR_H} fill="none" stroke={borderColor} strokeWidth={1} />
 
-      {/* Centre drag tab — fixed 28 px wide so it stays grabbable on narrow clips */}
+      {/* Centre drag tab — sits below the scrub bar so it doesn't overlap */}
       <rect
         x={midX - MOVE_TAB_R}
-        y={midY - 7}
+        y={PILL_Y}
         width={MOVE_TAB_R * 2}
         height={14}
         rx={3}
-        fill="rgba(255,255,255,0.18)"
-        stroke="rgba(255,255,255,0.30)"
+        fill="rgba(100,100,100,0.35)"
+        stroke="rgba(150,150,150,0.45)"
         strokeWidth={0.5}
       />
       {[-4, 0, 4].map((dx) => (
         <line
           key={dx}
-          x1={midX + dx} y1={midY - 4}
-          x2={midX + dx} y2={midY + 4}
-          stroke="rgba(255,255,255,0.55)"
+          x1={midX + dx} y1={PILL_Y + 3}
+          x2={midX + dx} y2={PILL_Y + 11}
+          stroke="rgba(200,200,200,0.7)"
           strokeWidth={0.75}
         />
       ))}
@@ -296,11 +303,11 @@ export default function TrimBar({
         </>
       )}
 
-      {/* Handle timestamp labels */}
-      <text x={lx + lblW / 2} y={BAR_TOP + BAR_H + 14} fontSize={8} fill="#555555" textAnchor="middle">
+      {/* Handle timestamp labels — below the pill */}
+      <text x={lx + lblW / 2} y={PILL_Y + 28} fontSize={8} fill="#888888" textAnchor="middle">
         {fmtTs(trimStart)}
       </text>
-      <text x={rx + lblW / 2} y={BAR_TOP + BAR_H + 14} fontSize={8} fill="#555555" textAnchor="middle">
+      <text x={rx + lblW / 2} y={PILL_Y + 28} fontSize={8} fill="#888888" textAnchor="middle">
         {fmtTs(trimEnd)}
       </text>
     </svg>

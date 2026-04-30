@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFolder: (folderPath: string): void =>
     ipcRenderer.send('shell:openFolder', folderPath),
 
+  openUrl: (url: string): void =>
+    ipcRenderer.send('shell:openUrl', url),
+
+  submitFeedback: (text: string): Promise<void> =>
+    ipcRenderer.invoke('clipper:submitFeedback', text),
+
   getApiBase: (): Promise<string> =>
     ipcRenderer.invoke('api:getBase'),
 
